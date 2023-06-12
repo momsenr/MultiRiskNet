@@ -22,21 +22,22 @@ import multiprocessing
 from multiprocessing import get_context
 import matplotlib.pyplot as plt
 from os.path import dirname, realpath
+
 sys.path.insert(0, dirname(dirname(realpath(__file__))))
 from cancerrisknet.utils.eval import include_exam_and_determine_label, get_probs_golds
+import matplotlib.pyplot as plt
 
 
 def mean_confidence_interval(data, *args, confidence=0.95):
-    a = 1.0*np.array(data)
+    a = 1.0 * np.array(data)
     k = 1 - confidence
     k *= 100
-    hm, m, mh = np.percentile(a, (k/2, 50, 100-k/2))
+    hm, m, mh = np.percentile(a, (k / 2, 50, 100 - k / 2))
     res = hm, m, mh, *args
     return res
 
 
 def get_boot_metric_clf(n):
-
     if n > 0:
         sample = np.random.choice(probs_for_eval.size, probs_for_eval.size, replace=True)
         probs = probs_for_eval[sample]
@@ -44,7 +45,7 @@ def get_boot_metric_clf(n):
     else:
         probs = probs_for_eval
         golds = golds_for_eval
-    
+
     fps, tps, thresholds = _binary_clf_curve(
         golds, probs, pos_label=1)
 
@@ -84,13 +85,13 @@ def get_boot_metric_clf(n):
     tn, fp, fn, tp = tns[idx_prc], fps[idx_prc], fns[idx_prc], tps[idx_prc]
 
     if n == 0:
-        return {"precision":precisions[::20].tolist(), 
-                "recall":recalls[::20].tolist(), 
-                "tpr": tprs[::20].tolist(), 
-                "fpr": fprs[::20].tolist(), 
-                "odds_ratio": odds_ratio[::20].tolist(), 
-                "thresholds":thresholds[::20].tolist(), 
-                "cm":[tn, fp, fn, tp]}
+        return {"precision": precisions[::20].tolist(),
+                "recall": recalls[::20].tolist(),
+                "tpr": tprs[::20].tolist(),
+                "fpr": fprs[::20].tolist(),
+                "odds_ratio": odds_ratio[::20].tolist(),
+                "thresholds": thresholds[::20].tolist(),
+                "cm": [tn, fp, fn, tp]}
     else:
         return auroc_, fpr_, tpr_, auprc_, precision_, recall_, odds_ratio_, incidence_, threshold_
 
@@ -101,22 +102,28 @@ def child_initialize(_probs_for_eval, _golds_for_eval):
     golds_for_eval = _golds_for_eval
 
 
-def get_performance_ci(probs_for_eval, golds_for_eval, model_name, prediction_interval, exclusion_interval, exp_id, n_boot=2):
-
-    with get_context("spawn").Pool(min(200, n_boot), initializer=child_initialize, initargs=(probs_for_eval, golds_for_eval)) as pool:
+def get_performance_ci(probs_for_eval, golds_for_eval, model_name, prediction_interval, exclusion_interval, exp_id,
+                       n_boot=2):
+    with get_context("spawn").Pool(min(1, n_boot), initializer=child_initialize,
+                                   initargs=(probs_for_eval, golds_for_eval)) as pool:
         metrics = pool.map(get_boot_metric_clf, range(n_boot))
     # metrics = [get_boot_metric(n) for n in tqdm(range(n_boot))]
-    curves = (None, json.dumps(metrics.pop(0)), None, model_name, 'curves', prediction_interval, exclusion_interval, exp_id)
+    curves = (
+    None, json.dumps(metrics.pop(0)), None, model_name, 'curves', prediction_interval, exclusion_interval, exp_id)
     auroc, fpr, tpr, auprc, precision, recall, odds_ratio, incidence, threshold = zip(*metrics)
-    incidence_ci = mean_confidence_interval(incidence, model_name, 'incidence', prediction_interval, exclusion_interval, exp_id)
+    incidence_ci = mean_confidence_interval(incidence, model_name, 'incidence', prediction_interval, exclusion_interval,
+                                            exp_id)
     auroc_ci = mean_confidence_interval(auroc, model_name, 'auroc', prediction_interval, exclusion_interval, exp_id)
     fpr_ci = mean_confidence_interval(fpr, model_name, 'fpr', prediction_interval, exclusion_interval, exp_id)
     tpr_ci = mean_confidence_interval(tpr, model_name, 'tpr', prediction_interval, exclusion_interval, exp_id)
     auprc_ci = mean_confidence_interval(auprc, model_name, 'auprc', prediction_interval, exclusion_interval, exp_id)
-    precision_ci = mean_confidence_interval(precision, model_name, 'precision', prediction_interval, exclusion_interval, exp_id)
-    recall_ci =  mean_confidence_interval(recall, model_name, 'recall', prediction_interval, exclusion_interval, exp_id)
-    odds_ratio_ci =  mean_confidence_interval(odds_ratio, model_name, 'odds_ratio', prediction_interval, exclusion_interval, exp_id)
-    threshold_ci =  mean_confidence_interval(threshold, model_name, 'thershold', prediction_interval, exclusion_interval, exp_id)
+    precision_ci = mean_confidence_interval(precision, model_name, 'precision', prediction_interval, exclusion_interval,
+                                            exp_id)
+    recall_ci = mean_confidence_interval(recall, model_name, 'recall', prediction_interval, exclusion_interval, exp_id)
+    odds_ratio_ci = mean_confidence_interval(odds_ratio, model_name, 'odds_ratio', prediction_interval,
+                                             exclusion_interval, exp_id)
+    threshold_ci = mean_confidence_interval(threshold, model_name, 'thershold', prediction_interval, exclusion_interval,
+                                            exp_id)
     return curves, incidence_ci, auroc_ci, fpr_ci, tpr_ci, auprc_ci, precision_ci, recall_ci, odds_ratio_ci, threshold_ci
 
 
@@ -138,13 +145,16 @@ def get_slice(df, model_name=None, metric_name=None, prediction_interval=None, e
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Grid Search Results Collector.')
-    parser.add_argument("--search_metadata", required=True, type=str, help="Path of the config for the experiment to use to generate the table")
+    parser.add_argument("--search_metadata", required=True, type=str,
+                        help="Path of the config for the experiment to use to generate the table")
     parser.add_argument('--bootstrap_size', type=int, default=200, help='Number of bootstraps')
-    parser.add_argument('--n_samples', type=int, default=1, help='Downsample the output prediction. 1 for every N samples.')
-    parser.add_argument('--filename', type=str, default='bootstrap', help='Downsample the output prediction. 1 for every N samples.')
+    parser.add_argument('--n_samples', type=int, default=1,
+                        help='Downsample the output prediction. 1 for every N samples.')
+    parser.add_argument('--filename', type=str, default='bootstrap',
+                        help='Downsample the output prediction. 1 for every N samples.')
 
     args = parser.parse_args()
-    
+
     assert args.bootstrap_size > 1, "Choose a boot size higher than 1. "
     if 'json' in args.search_metadata:
         best_exp_ids_config = json.load(open(args.search_metadata, 'r'))
@@ -153,10 +163,13 @@ if __name__ == "__main__":
         best_exp_ids_config = best_exp_ids_config.drop_duplicates()
         best_exp_ids_config = best_exp_ids_config.to_dict('list')
     prefix = '{}_TableS4'.format(args.filename)
-    
+
     metrics_records = []
-    for i, (exp_id, save_dir, model_name, exclusion_interval) in enumerate(zip(best_exp_ids_config['exp_id'], best_exp_ids_config['save_dir'], best_exp_ids_config['model_name'], best_exp_ids_config['exclusion_interval'])):
-        printing_prefix = "[Step5-ResultsBootstrap][{}/{}][{}]".format(i+1, len(best_exp_ids_config['exp_id']), exp_id)
+    for i, (exp_id, save_dir, model_name, exclusion_interval) in enumerate(
+            zip(best_exp_ids_config['exp_id'], best_exp_ids_config['save_dir'], best_exp_ids_config['model_name'],
+                best_exp_ids_config['exclusion_interval'])):
+        printing_prefix = "[Step5-ResultsBootstrap][{}/{}][{}]".format(i + 1, len(best_exp_ids_config['exp_id']),
+                                                                       exp_id)
         results_path = os.path.join(save_dir, "{}.results".format(exp_id))
         test_preds_path = os.path.join(save_dir, "{}.results.test_preds".format(exp_id))
         if (not os.path.exists(results_path)) or (not os.path.exists(test_preds_path)):
@@ -170,20 +183,91 @@ if __name__ == "__main__":
             probs_for_eval, golds_for_eval = get_probs_golds(test_preds, index=index)
             probs_for_eval = np.array(probs_for_eval)[::args.n_samples]
             golds_for_eval = np.array(golds_for_eval)[::args.n_samples]
-            
+
             if not np.sum(golds_for_eval) > 0:
                 continue
 
+            try:
+                save_path_AUROC = os.path.join(save_dir, "{}.results.test_preds.{}.auroc.png".format(exp_id, month))
+                save_path_AUPRC = os.path.join(save_dir, "{}.results.test_preds.{}.auprc.png".format(exp_id, month))
+                save_path_RRcurve = os.path.join(save_dir, "{}.results.test_preds.{}.RR.png".format(exp_id, month))
+                fpr, tpr, _ = sklearn.metrics.roc_curve(golds_for_eval, probs_for_eval, pos_label=1)
+                precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(golds_for_eval, probs_for_eval,
+                                                                                pos_label=1)
+
+                auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
+                auc_prc = sklearn.metrics.auc(recalls, precisions)
+
+                # change shape of precisions from (238151,) to (238150,)
+                precisions_reshaped = precisions[:-1]
+
+                # incidence should have the same shape as precisions_reshaped, and
+                # the value at the ith index should be i/len(precisions_reshaped)
+                incidence=np.divide(np.arange(len(precisions_reshaped)),len(precisions_reshaped))
+                
+                # calculate RR
+                RR=np.divide(precisions_reshaped,incidence)
+                
+                incidence=incidence*1000000
+
+                # Plot ROC curve
+                plt.figure()
+                plt.plot(fpr, tpr, color='blue', lw=2, label='ROC curve (AUC = {:.2f})'.format(auc_roc))
+                plt.plot([0, 1], [0, 1], color='red', lw=2, linestyle='--')
+                plt.xlim([0.0, 1.0])
+                plt.ylim([0.0, 1.05])
+                plt.xlabel('False Positive Rate')
+                plt.ylabel('True Positive Rate')
+                plt.title('Receiver Operating Characteristic')
+                plt.legend(loc='lower right')
+                # Save the ROC curve plot if save_path is provided
+                plt.savefig(save_path_AUROC)
+                plt.close()
+
+                # Plot Precision-Recall curve
+                plt.figure()
+                plt.plot(recalls, precisions, color='blue', lw=2,
+                         label='Precision-Recall curve (AUC = {:.2f})'.format(auc_prc))
+                plt.xlim([0.0, 1.0])
+                plt.ylim([0.0, 1.05])
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.title('Precision-Recall Curve')
+                plt.legend(loc='lower right')
+
+                # Save the Precision-Recall curve plot if save_path is provided
+                plt.savefig(save_path_AUPRC)
+                plt.close()
+
+                # plot relative risk  curve
+                plt.figure()
+                plt.plot(incidence, RR, color='blue', lw=2,
+                            label='RR curve')
+                plt.xlim([110, 200000])
+                plt.ylim([0.0, 200])
+                plt.xlabel('Incidence per 1M')
+                plt.ylabel('RR')
+                plt.title('RR Curve')
+                plt.legend(loc='lower right')
+                plt.xscale('log')  # Set x-axis to logarithmic scale
+                plt.savefig(save_path_RRcurve)
+                plt.close()
+
+            except Exception as e:
+                warnings.warn("Failed to calculate AUROC/AUPRC because {}".format(e))
+
             print(printing_prefix, "Processing time interval: {} [{}/{}].".format(
-                month, index+1, len(results['month_endpoints'])))
+                month, index + 1, len(results['month_endpoints'])))
             experiment_performance = get_performance_ci(probs_for_eval, golds_for_eval, model_name, month,
                                                         exclusion_interval, exp_id, n_boot=args.bootstrap_size)
             metrics_records.extend(experiment_performance)
 
     os.makedirs(os.path.join(os.path.dirname(args.search_metadata), 'figures'), exist_ok=True)
     os.chdir(os.path.join(os.path.dirname(args.search_metadata), 'figures'))
-    df = pd.DataFrame.from_records(metrics_records, columns=['ci_low', 'Median', 'ci_high', 'Model', 'Metric', 'Prediction Interval', 'Exclusion Interval', 'exp_id'])
-    df = df.astype({'Prediction Interval':'int32', "Exclusion Interval":'int32'})
+    df = pd.DataFrame.from_records(metrics_records,
+                                   columns=['ci_low', 'Median', 'ci_high', 'Model', 'Metric', 'Prediction Interval',
+                                            'Exclusion Interval', 'exp_id'])
+    df = df.astype({'Prediction Interval': 'int32', "Exclusion Interval": 'int32'})
     df.to_csv(prefix + '.Performance_table.csv', sep=',', index=False)
 
     df['print_aucs'] = ["{:.3f} ({:.3f}-{:.3f})".format(i['Median'], i['ci_low'], i['ci_high'])
@@ -191,7 +275,8 @@ if __name__ == "__main__":
     df['print_specificity'] = ["{:.2%} ({:.2%}-{:.2%})".format(1 - i['Median'], 1 - i['ci_high'], 1 - i['ci_low'])
                                if i['Metric'] == 'fpr' else np.nan for i in df.iloc]
     df['print_others'] = ["{:.1%} ({:.1%}-{:.1%})".format(i['Median'], i['ci_low'], i['ci_high'])
-                          if i['Metric'][:2] not in ['au', 'fp'] and i['Metric'] not in ['curves'] else np.nan for i in df.iloc]
+                          if i['Metric'][:2] not in ['au', 'fp'] and i['Metric'] not in ['curves'] else np.nan for i in
+                          df.iloc]
     df['print_merged'] = [i['print_specificity'] if i['Metric'] == 'fpr' else i['print_others'] for i in df.iloc]
 
     get_slice(df, metric_name='auroc').pivot_table(
