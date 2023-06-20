@@ -194,21 +194,42 @@ if __name__ == "__main__":
                 fpr, tpr, _ = sklearn.metrics.roc_curve(golds_for_eval, probs_for_eval, pos_label=1)
                 precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(golds_for_eval, probs_for_eval,
                                                                                 pos_label=1)
+                print("analyzing month in test set...")
+                print(month)
+                print(len(probs_for_eval))
 
                 auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
                 auc_prc = sklearn.metrics.auc(recalls, precisions)
 
                 # change shape of precisions from (238151,) to (238150,)
                 precisions_reshaped = precisions[:-1]
-
+                print("precisions, from low to high")
+                print(precisions_reshaped)
+                print("tresholds")
+                print(thresholds)
+                
+                print("incidences")
+                tmp=np.arange(len(precisions_reshaped),0,-1)
+                print(tmp)
+                
                 # incidence should have the same shape as precisions_reshaped, and
                 # the value at the ith index should be i/len(precisions_reshaped)
-                incidence=np.divide(np.arange(len(precisions_reshaped)),len(precisions_reshaped))
-                
+                #TODO: length +1 -1 needs to be finetuned
+                incidence_ratio=np.divide(np.arange(len(precisions_reshaped),0,-1),len(precisions_reshaped))
+                print("incidence ratios")
+                print(incidence_ratio)
                 # calculate RR
-                RR=np.divide(precisions_reshaped,incidence)
+                RR=np.divide(precisions_reshaped,incidence_ratio)
+                print("relative risk ratio")
+                print(RR)
                 
-                incidence=incidence*1000000
+                print("at - 1000")
+                print(precisions_reshaped[- 1000])
+                print(tmp[- 1000])
+                print(incidence_ratio[-1000])
+                print(RR[-1000])
+                #incidence per M
+                incidence_per_M=incidence_ratio*1000000
 
                 # Plot ROC curve
                 plt.figure()
@@ -241,15 +262,15 @@ if __name__ == "__main__":
 
                 # plot relative risk  curve
                 plt.figure()
-                plt.plot(incidence, RR, color='blue', lw=2,
+                plt.plot(incidence_per_M, RR, color='blue', lw=2,
                             label='RR curve')
-                plt.xlim([110, 200000])
-                plt.ylim([0.0, 200])
+                plt.xlim([300, 200000])
+                plt.ylim([0.0, 250])
                 plt.xlabel('Incidence per 1M')
                 plt.ylabel('RR')
                 plt.title('RR Curve')
                 plt.legend(loc='lower right')
-                plt.xscale('log')  # Set x-axis to logarithmic scale
+                #plt.xscale('log')  # Set x-axis to logarithmic scale
                 plt.savefig(save_path_RRcurve)
                 plt.close()
 
@@ -298,4 +319,3 @@ if __name__ == "__main__":
         values='print_merged', index=['Model', 'Exclusion Interval', 'Metric'],
         columns=['Prediction Interval'], aggfunc=lambda x: [v for v in x][0]
     ).fillna('-').to_csv(prefix + ".Performance_summary_p-r-s.csv")
-
