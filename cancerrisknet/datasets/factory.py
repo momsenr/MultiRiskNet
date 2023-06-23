@@ -1,3 +1,4 @@
+import orjson
 import json
 import pickle
 import tqdm
@@ -59,7 +60,7 @@ def build_code_to_index_map(args):
     all_codes_p = [i/sum(all_codes_p) for i in all_codes_p]
     code_to_index_map = {code: i+1 for i, code in enumerate(all_codes)}
     code_to_index_map.update({
-        PAD_TOKEN: 0, 
+        PAD_TOKEN: 0,
         UNK_TOKEN: len(code_to_index_map)+1
         })
     args.code_to_index_map = code_to_index_map
@@ -72,7 +73,9 @@ def get_dataset(args):
         Generate torch-compatible dataset instances for training, evaluation or any other analysis.
     """
     # Depending on arg, build dataset
-    metadata = json.load(open(args.metadata_path, 'r'))
+    with open(args.metadata_path, 'r') as f:
+        metadata = orjson.loads(f.read())
+    #metadata = json.loads(open(args.metadata_path, 'r'))
     dataset_class = get_dataset_class(args)
 
     train = dataset_class(metadata, args, 'train') if args.train else []
