@@ -34,7 +34,7 @@ if __name__ == '__main__':
     print(datetime.datetime.now())
     metadata = json.load(open(metadata_path, 'r'))
     print(datetime.datetime.now())
-
+    del metadata
     print(datetime.datetime.now())
     metadata = orjson.loads(open(metadata_path, 'r').read)
     print(datetime.datetime.now())
