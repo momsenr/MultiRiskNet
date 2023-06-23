@@ -9,6 +9,8 @@ from cancerrisknet.datasets.disease_progression import DiseaseProgressionDataset
 import cancerrisknet.models.factory as model_factory
 import cancerrisknet.learn.train_debug as train
 import cancerrisknet.utils.eval as eval
+import datetime
+import orjson
 
 from cancerrisknet.utils.learn import init_metrics_dictionary, \
     get_dataset_loader, get_train_variables
@@ -27,9 +29,16 @@ if __name__ == '__main__':
     # logger_main = TimeLogger(args, 1, hierachy=5, model_name=args.results_path) if args.time_logger_verbose >= 1 else TimeLogger(args, 0, model_name=args.results_path)
     # logger_main.log("Now main.py starts...")
     data_dir = 'data'
-    metadata_path = os.path.join(data_dir, 'sliced_4.json')
+    metadata_path = os.path.join(data_dir, 'MS_full_0622_anon.json')
     print("Loading Dataset...")
+    print(datetime.datetime.now())
     metadata = json.load(open(metadata_path, 'r'))
+    print(datetime.datetime.now())
+
+    print(datetime.datetime.now())
+    metadata = orjson.loads(open(metadata_path, 'r').read)
+    print(datetime.datetime.now())
+
     args.code_to_index_map = json.load(open(args.results_path + '.code_map', 'r'))
     args.index_map_length = len(args.code_to_index_map)
     # dataset_class = get_dataset_class(args)
