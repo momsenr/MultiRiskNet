@@ -1,6 +1,6 @@
 {
   "search_space": {
-    "metadata":["data/Market_1951_anon.json"],
+    "metadata":["data/MS_full_0623_anon.json"],
     "train":[true],
     "dev":[true],
     "dropout":[0],
@@ -31,7 +31,7 @@
     "use_known_risk_factors": [false],
     "use_age_embed": [true],
     "use_time_embed": [true],
-    "data_setting_path": ["data/settings_MarketScan_OMOP.yaml"]
+    "data_setting_path": ["data/settings_MarketScan_native.yaml"]
   },
   "available_gpus": [1]
 }
