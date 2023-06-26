@@ -88,7 +88,7 @@ for k, metadata_path in enumerate(metadata_paths):
     idx = "({} out of {})".format(k + 1, len(metadata_paths))
     print("[Step1-CheckFiles][3/3] Checking metadata and associated vocabulary {}...".format(idx))
     try:
-        metadata = orjson.load(open(metadata_path, 'r').read())
+        metadata = orjson.loads(open(metadata_path, 'r').read())
     except FileNotFoundError:
         print("[Step1-CheckFiles][3/3]{} Metadata {} not found. Aborting.".format(idx, metadata_path))
         sys.exit(1)

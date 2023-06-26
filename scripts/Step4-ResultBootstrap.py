@@ -270,7 +270,7 @@ if __name__ == "__main__":
                 plt.ylabel('RR')
                 plt.title('RR Curve')
                 plt.legend(loc='lower right')
-                #plt.xscale('log')  # Set x-axis to logarithmic scale
+                plt.xscale('log')  # Set x-axis to logarithmic scale
                 plt.savefig(save_path_RRcurve)
                 plt.close()
 
