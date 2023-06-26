@@ -1,6 +1,6 @@
 from cancerrisknet.utils.date import parse_date
 
-MIN_FOLLOWUP_YEAR_IF_NEG = 2  # TODO: this should move to data/SETTINGS or parser too.
+#MIN_FOLLOWUP_YEAR_IF_NEG = 10  # TODO: this should move to data/SETTINGS or parser too.
 
 
 def get_avai_trajectory_indices(patient, events, args):
@@ -60,6 +60,7 @@ def is_valid_trajectory(events_to_date, outcome_date, future_panc_cancer, args):
     is_valid_pos = future_panc_cancer and is_pos_pre_cancer and is_pos_in_time_horizon
 
     # Filter (4)
+    MIN_FOLLOWUP_YEAR_IF_NEG = args.min_followup_year_if_neg
     is_valid_neg = not future_panc_cancer and \
         (outcome_date - events_to_date[-1]['admit_date']).days // 365 > MIN_FOLLOWUP_YEAR_IF_NEG
 

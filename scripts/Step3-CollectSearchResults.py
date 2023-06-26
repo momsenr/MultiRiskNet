@@ -28,7 +28,7 @@ SUMMARIZING_MSG = "[Step3-CollectSearchResults][1/3][INFO] Summarizing results {
 SUMMARYFOUND_MSG = "[Step3-CollectSearchResults][1/3][WARNING] Existing summary file."
 SUCESSFUL_SEARCH_STR = "[Step3-CollectSearchResults][2/3][INFO] SUCCESS! All summary files are retrieved into {}."
 NEXT_COMMAND = "\n[Step3-CollectSearchResults][NEXT] Run the following command to generate the performance table " \
-               "(metrics and CI):\n`python scripts/Step5-ResultBootstrap.py --search_metadata {}`" \
+               "(metrics and CI):\n`python scripts/Step4-ResultBootstrap.py --search_metadata {}`" \
                "\nNote that if --test was not run in the original search, " \
                "a resumed run might be needed (see the optional Step 4)."
 EPSILON = 1e-9

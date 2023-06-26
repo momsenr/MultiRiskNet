@@ -55,7 +55,8 @@ def parse_args(args_str=None):
                              "If no_random_sample_eval_trajectories=True, use all the trajectories.")
     parser.add_argument('--max_eval_indices', type=int, default=250,
                         help="Max number of trajectories to include for each patient during dev and test. ")
-
+    parser.add_argument('--min_followup_year_if_neg', type=int, default=2,
+                        help="Min number of years to be required for a trajectory to count as negative. ")
     # Hyper-params for model training
     parser.add_argument('--model_name', type=str, default='transformer', help="Model to be used.")
     parser.add_argument('--num_layers', type=int, default=1, help="Number of layers to use for sequential NNs.")
