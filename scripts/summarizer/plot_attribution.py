@@ -18,7 +18,8 @@ import os
 import argparse
 from os.path import dirname, realpath
 sys.path.insert(0, dirname(dirname(dirname(realpath(__file__)))))
-from cancerrisknet.utils.parsing import CODE2DESCRIPTION, get_code, parse_args
+#from cancerrisknet.utils.parsing import CODE2DESCRIPTION, get_code, parse_args
+from cancerrisknet.utils.parsing import get_code, parse_args
 from cancerrisknet.datasets.disease_progression import PANC_CANCER_CODE, ICD10_PANC_CANCER, \
     ICD8_PANC_CANCER, BASELINE_DISEASES,END_OF_TIME_DATE
 
@@ -137,6 +138,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_features", type=int, default=30, help="Path of the master experiment config")
 
     args = parser.parse_args()
+    data_settings = load_data_settings(args)
+    CODE2DESCRIPTION = data_settings['CODE2DESCRIPTION']
 
     code_freq_cancer = pickle.load(open("data/pc_icd_freq.pkl", 'rb'))
     code_freq_all = pickle.load(open("data/all_icd_freq.pkl", 'rb'))
