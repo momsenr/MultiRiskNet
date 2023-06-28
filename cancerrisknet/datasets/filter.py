@@ -44,7 +44,7 @@ def is_valid_trajectory(events_to_date, outcome_date, future_panc_cancer, args):
      (3) The cancer event must occurr within the certain time after the time of assessment.
 
     Or if the patient is not a cancer patient
-     (4) The trajectory must end at least MIN_FOLLOWUP_YEAR_IF_NEG before the end of the dataset
+     (4) The trajectory must end at least args.min_followup_year_if_neg before the end of the dataset
          to exclude those cancer patients died of other reasons with the cancer undetected.
 
     """
@@ -60,9 +60,8 @@ def is_valid_trajectory(events_to_date, outcome_date, future_panc_cancer, args):
     is_valid_pos = future_panc_cancer and is_pos_pre_cancer and is_pos_in_time_horizon
 
     # Filter (4)
-    MIN_FOLLOWUP_YEAR_IF_NEG = args.min_followup_year_if_neg
     is_valid_neg = not future_panc_cancer and \
-        (outcome_date - events_to_date[-1]['admit_date']).days // 365 > MIN_FOLLOWUP_YEAR_IF_NEG
+        (outcome_date - events_to_date[-1]['admit_date']).days // 365 > args.min_followup_year_if_neg
 
     return is_valid_neg or is_valid_pos
 
