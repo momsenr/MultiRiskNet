@@ -35,7 +35,7 @@ plt.rc('legend', fontsize=12)    # legend fontsize
 plt.rc('figure', titlesize=24)  # fontsize of the figure title
 
 
-def get_probs_golds(test_preds, month='36', args=args):
+def get_probs_golds(test_preds, month, args):
 
     probs_for_eval, golds_for_eval, time_to_event = [], [], []
     for prob_arr, censor_time, gold, days_to_censor in tqdm(zip(test_preds["probs"], test_preds["censor_times"], test_preds["golds"], test_preds['days_to_final_censors'])):
@@ -69,6 +69,7 @@ def load_preds(log_dir, exp_id, n_samples=1):
 
 def code_fn(x):
     if x in CODE2DESCRIPTION:
+        #return x
         return CODE2DESCRIPTION[x][:35] + '\n' + CODE2DESCRIPTION[x][35:]
     if x[0] == 'D':
         if x[1:] in CODE2DESCRIPTION:
@@ -115,19 +116,21 @@ if __name__ == "__main__":
             time_idx = time_bins[time_bins>=time][0]
             for code, code_attr in censored_attribution[time].items():
                 attribution_rank[time_idx][code].extend(code_attr)
-            
+
         for time in attribution_rank:
             attribution_rank[time] = sorted([(code_fn(k), np.sum(v), k) for k,v in attribution_rank[time].items()], key=lambda x: x[1], reverse=True)
         
         attribution_records = []
         color_records = []
         for top_guess in range(args.top_guess):
+
             time_records = [attribution_rank[t][top_guess][0] for t in sorted(attribution_rank) if attribution_rank[t]]
             code_for_color = [attribution_rank[t][top_guess][-1] for t in sorted(attribution_rank) if attribution_rank[t]]
 
             color_records.append([SETTINGS.chapterColors[icd2chapter[el[1:]]-1] if el[1:] \
                 in icd2chapter and el[0]=='D' else 'w' for el in code_for_color])
             attribution_records.append(time_records)
+        print(attribution_records)
     else:
         attribution_records = None
 
@@ -139,7 +142,7 @@ if __name__ == "__main__":
     ax_objs_r = []
 
     for i, month in enumerate(args.timepoints_of_interest):
-        probs_for_eval, golds_for_eval, time_to_event = get_probs_golds(test_preds, month=month, args=args)
+        probs_for_eval, golds_for_eval, time_to_event = get_probs_golds(test_preds, month, args)
         #metrics generation
         fps, tps, thresholds = _binary_clf_curve(
             golds_for_eval, probs_for_eval, pos_label=1)
