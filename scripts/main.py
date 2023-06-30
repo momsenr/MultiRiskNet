@@ -12,6 +12,7 @@ import cancerrisknet.learn.attribute as attribute
 from cancerrisknet.utils.parsing import parse_args
 from cancerrisknet.utils.time_logger import TimeLogger
 import torch
+import matplotlib as plt
 
 if __name__ == '__main__':
 
@@ -57,9 +58,24 @@ if __name__ == '__main__':
         logger_main.log("TRAINING")
         args_dict = vars(args).copy(); del args_dict['code_to_index_map']; pickle.dump(args_dict, open(results_path, 'wb'))
         pickle.dump(epoch_stats, open("{}.{}".format(args.results_path, "epoch_stats"), 'wb'))
+        train_loss=epoch_stats['train_loss']
+        dev_loss=epoch_stats['dev_loss']
         del epoch_stats
         logger_main.log("Dump results")
 
+        #Plot the train loss curve
+        plt.plot(train_loss, label='Training loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.title('Training loss')
+        plt.savefig(args.results_path+'train_loss.png')
+
+        #Plot the dev loss curve
+        plt.plot(dev_loss, label='Dev loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.title('Training loss')
+        plt.savefig(args.results_path+'dev_loss.png')
     print()
     if args.dev:
         print("-------------\nDev")
