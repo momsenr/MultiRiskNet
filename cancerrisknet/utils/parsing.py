@@ -34,7 +34,7 @@ def parse_args(args_str=None):
     parser.add_argument('--metadata_path', type=str, default='data/metadata.json', help="Path of json source datafile")
     parser.add_argument('--data_setting_path', type=str, default='data/settings.yaml',
                         help="Path of yaml with data specific settings")
-    parser.add_argument('--month_endpoints', nargs='+', default=[3, 6, 12, 36, 60, 120],
+    parser.add_argument('--month_endpoints', nargs='+', type=int, default=[3, 6, 12, 36, 60, 120],
                         help="List of month endpoints at which to generate risk prediction.")
     parser.add_argument('--pad_size', type=int, default=None,
                         help="Padding the trajectories to how long for training. Default: Pad every trajectory to "
