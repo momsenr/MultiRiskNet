@@ -12,7 +12,7 @@ import cancerrisknet.learn.attribute as attribute
 from cancerrisknet.utils.parsing import parse_args
 from cancerrisknet.utils.time_logger import TimeLogger
 import torch
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
 
