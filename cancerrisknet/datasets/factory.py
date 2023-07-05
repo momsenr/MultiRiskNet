@@ -10,6 +10,7 @@ from os.path import dirname, realpath
 sys.path.insert(0, dirname(dirname(realpath(__file__))))
 from cancerrisknet.utils.parsing import md5
 from cancerrisknet.utils.parsing import get_code
+import pickle
 
 
 NO_DATASET_ERR = "Dataset {} not in DATASET_REGISTRY! Available datasets are {}"
@@ -73,9 +74,12 @@ def get_dataset(args):
         Generate torch-compatible dataset instances for training, evaluation or any other analysis.
     """
     # Depending on arg, build dataset
-    with open(args.metadata_path, 'r') as f:
-        metadata = orjson.loads(f.read())
-    #metadata = json.loads(open(args.metadata_path, 'r'))
+    if args.metadata_path.endswith('.json'):
+        with open(args.metadata_path, 'r') as f:
+            metadata = orjson.loads(f.read())
+    elif metadata_path.endswith('.pickle'):
+        metadata = pickle.load(open(metadata_path, 'rb'))
+
     dataset_class = get_dataset_class(args)
 
     train = dataset_class(metadata, args, 'train') if args.train else []
