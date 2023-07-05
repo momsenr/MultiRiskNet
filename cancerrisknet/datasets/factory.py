@@ -45,9 +45,15 @@ def build_code_to_index_map(args):
         following steps under `scripts/metadata/`.
     """
     print("Building code to index map...")
-    vocab_path = os.path.join(
-        os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.json', '-vocab.txt')
-    )
+    if(args.metadata_path.endswith('.json')):
+        vocab_path = os.path.join(
+            os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.json', '-vocab.txt')
+            )
+    elif(args.metadata_path.endswith('.pickle')):
+        vocab_path = os.path.join(
+            os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.pickle', '-vocab.txt')
+            )
+
     with open(vocab_path, 'r') as f:
         all_codes = f.readlines()
         all_codes = [x.rstrip('\n') for x in all_codes]
