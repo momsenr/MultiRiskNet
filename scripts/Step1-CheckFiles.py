@@ -98,6 +98,9 @@ for k, metadata_path in enumerate(metadata_paths):
             vocab_path = os.path.join(
                 os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.pickle', '-vocab.txt')
             )
+        else:
+            print("[Step1-CheckFiles][3/3]{} Metadata {} not supported. Aborting.".format(idx, metadata_path))
+            sys.exit(1)
     except FileNotFoundError:
         print("[Step1-CheckFiles][3/3]{} Metadata {} not found. Aborting.".format(idx, metadata_path))
         sys.exit(1)
