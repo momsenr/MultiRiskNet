@@ -201,36 +201,11 @@ if __name__ == "__main__":
                 auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
                 auc_prc = sklearn.metrics.auc(recalls, precisions)
 
-                # change shape of precisions from (238151,) to (238150,)
-                precisions_reshaped = precisions[:-1]
-                #print("precisions, from low to high")
-                #print(precisions_reshaped)
-                #print("tresholds")
-                #print(thresholds)
-                
-                #print("incidences")
-                tmp=np.arange(len(precisions_reshaped),0,-1)
-                #print(tmp)
-                
-                # incidence should have the same shape as precisions_reshaped, and
-                # the value at the ith index should be i/len(precisions_reshaped)
-                #TODO: length +1 -1 needs to be finetuned
-                incidence_ratio=np.divide(np.arange(len(precisions_reshaped),0,-1),len(precisions_reshaped))
-                #print("incidence ratios")
-                #print(incidence_ratio)
-                # calculate RR
-                RR=np.divide(precisions_reshaped,incidence_ratio)
-                #print("relative risk ratio")
-                #print(RR)
-                
-                #print("at - 1000")
-                #print(precisions_reshaped[- 1000])
-                #print(tmp[- 1000])
-                #print(incidence_ratio[-1000])
-                #print(RR[-1000])
-                #incidence per M
-                incidence_per_M=incidence_ratio*1000000
+                print("incidence")
+                incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
+                print(incidence_ratio)
 
+                RR=np.divide(precisions,incidence_ratio)
                 # Plot ROC curve
                 plt.figure()
                 plt.plot(fpr, tpr, color='blue', lw=2, label='ROC curve (AUC = {:.2f})'.format(auc_roc))
@@ -262,17 +237,23 @@ if __name__ == "__main__":
 
                 # plot relative risk  curve
                 plt.figure()
-                plt.plot(incidence_per_M, RR, color='blue', lw=2,
+                plt.plot(recalls*1000000, RR, color='blue', lw=2,
                             label='RR curve')
                 plt.xlim([300, 200000])
                 plt.ylim([0.0, 250])
-                plt.xlabel('Incidence per 1M')
+                plt.xlabel('n at risk per 1M')
                 plt.ylabel('RR')
                 plt.title('RR Curve')
                 plt.legend(loc='lower right')
                 plt.xscale('log')  # Set x-axis to logarithmic scale
                 plt.savefig(save_path_RRcurve)
                 plt.close()
+
+                #idesired_recall = 0.0001  # Replace with your desired recall value
+                #idx = np.where(recall >= desired_recall)[0][0]
+                #desired_threshold = thresholds[idx]
+                #false_positive_examples = np.where(y_scores >= desired_threshold)[0]
+
 
             except Exception as e:
                 warnings.warn("Failed to calculate AUROC/AUPRC because {}".format(e))
