@@ -9,7 +9,7 @@ from os.path import dirname, realpath
 import pkg_resources
 import warnings
 import orjson
-
+import pickle
 
 # Step 1: Check package and update if needed
 print("[Step1-CheckFiles][1/3] Checking python environment and version...")
@@ -88,14 +88,20 @@ for k, metadata_path in enumerate(metadata_paths):
     idx = "({} out of {})".format(k + 1, len(metadata_paths))
     print("[Step1-CheckFiles][3/3] Checking metadata and associated vocabulary {}...".format(idx))
     try:
-        metadata = orjson.loads(open(metadata_path, 'r').read())
+        if metadata_path.endswith('.json'):
+            metadata = orjson.loads(open(metadata_path, 'r').read())
+            vocab_path = os.path.join(
+                os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.json', '-vocab.txt')
+            )
+        elif metadata_path.endswith('.pickle'):
+            metadata = pickle.load(open(metadata_path, 'rb'))
+            vocab_path = os.path.join(
+                os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.pickle', '-vocab.txt')
+            )
     except FileNotFoundError:
         print("[Step1-CheckFiles][3/3]{} Metadata {} not found. Aborting.".format(idx, metadata_path))
         sys.exit(1)
 
-    vocab_path = os.path.join(
-        os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.json', '-vocab.txt')
-    )
     if os.path.exists(vocab_path):
         print("[Step1-CheckFiles][3/3]{} The vocabulary for metadata {} found! Checking...".format(idx, metadata_path))
         codes = open(vocab_path, 'r').readlines()
