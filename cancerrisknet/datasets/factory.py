@@ -83,8 +83,8 @@ def get_dataset(args):
     if args.metadata_path.endswith('.json'):
         with open(args.metadata_path, 'r') as f:
             metadata = orjson.loads(f.read())
-    elif metadata_path.endswith('.pickle'):
-        metadata = pickle.load(open(metadata_path, 'rb'))
+    elif args.metadata_path.endswith('.pickle'):
+        metadata = pickle.load(open(args.metadata_path, 'rb'))
 
     dataset_class = get_dataset_class(args)
 
