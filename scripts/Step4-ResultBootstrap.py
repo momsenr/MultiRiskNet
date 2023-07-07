@@ -203,9 +203,16 @@ if __name__ == "__main__":
 
                 print("incidence")
                 incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
-                print(incidence_ratio)
 
+                #count how many people are at risk with prediction > thresholds
+                at_risk=np.array([])
+                for i in range(len(thresholds)):
+                    at_risk=np.append(at_risk,np.sum(probs_for_eval>thresholds[i]))
+
+                at_risk=(at_risk*1000000)/len(golds_for_eval)
                 RR=np.divide(precisions,incidence_ratio)
+                RR_flip=np.flip(RR)
+
                 # Plot ROC curve
                 plt.figure()
                 plt.plot(fpr, tpr, color='blue', lw=2, label='ROC curve (AUC = {:.2f})'.format(auc_roc))
@@ -237,7 +244,7 @@ if __name__ == "__main__":
 
                 # plot relative risk  curve
                 plt.figure()
-                plt.plot(recalls*1000000, RR, color='blue', lw=2,
+                plt.plot(risk, RR_flip, color='blue', lw=2,
                             label='RR curve')
                 plt.xlim([300, 200000])
                 plt.ylim([0.0, 250])
@@ -249,9 +256,9 @@ if __name__ == "__main__":
                 plt.savefig(save_path_RRcurve)
                 plt.close()
 
-                #idesired_recall = 0.0001  # Replace with your desired recall value
-                #idx = np.where(recall >= desired_recall)[0][0]
-                #desired_threshold = thresholds[idx]
+
+
+
                 #false_positive_examples = np.where(y_scores >= desired_threshold)[0]
 
 
