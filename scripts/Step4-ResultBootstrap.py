@@ -194,18 +194,17 @@ if __name__ == "__main__":
                 fpr, tpr, _ = sklearn.metrics.roc_curve(golds_for_eval, probs_for_eval, pos_label=1)
                 precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(golds_for_eval, probs_for_eval,
                                                                                 pos_label=1)
-                print("analyzing month in test set...")
 
                 auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
                 auc_prc = sklearn.metrics.auc(recalls, precisions)
 
+                # compute RR curve
                 incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
-
-                fps, tps, thresholds2 = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
+                fps, tps, _ = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
                 positives=fps+tps
-                precisions2=tps/positives
+                precisions_from_binary_clf=tps/positives
                 at_risk=positives*1000000/len(golds_for_eval)
-                RR=np.divide(precisions2,incidence_ratio)
+                RR=np.divide(precisions_from_binary_clf,incidence_ratio)
 
                 # Plot ROC curve
                 plt.figure()
