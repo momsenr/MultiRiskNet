@@ -204,9 +204,10 @@ if __name__ == "__main__":
 
                 fps, tps, thresholds2 = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
 
-                if(thresholds2==tresholds):
-                    print("juhu")
+                #if(thresholds2==tresholds):
+                #    print("juhu")
                 positives=fps+tps
+                precisions2=tps/positives
                 #index=[]
                 #index[0] = np.argmin(np.abs(positives - 250))
                 #index[1] = np.argmin(np.abs(positives - 500))
@@ -217,7 +218,7 @@ if __name__ == "__main__":
                 positives_scaled=positives*1000000/len(golds_for_eval)
 
                 #at_risk=(at_risk*1000000)/len(golds_for_eval)
-                RR=np.divide(precisions,incidence_ratio)
+                RR=np.divide(precisions2,incidence_ratio)
                 RR_flip=np.flip(RR)
 
                 # Plot ROC curve
