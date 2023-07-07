@@ -199,7 +199,6 @@ if __name__ == "__main__":
                 auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
                 auc_prc = sklearn.metrics.auc(recalls, precisions)
 
-                print("incidence")
                 incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
 
                 fps, tps, thresholds2 = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
