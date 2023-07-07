@@ -203,23 +203,10 @@ if __name__ == "__main__":
                 incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
 
                 fps, tps, thresholds2 = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
-
-                #if(thresholds2==tresholds):
-                #    print("juhu")
                 positives=fps+tps
                 precisions2=tps/positives
-                #index=[]
-                #index[0] = np.argmin(np.abs(positives - 250))
-                #index[1] = np.argmin(np.abs(positives - 500))
-                #index[2] = np.argmin(np.abs(positives - 1000))
-                #index[3] = np.argmin(np.abs(positives - 2000))
-                #index[4] = np.argmin(np.abs(positives - 4000))
-                #index[5] = np.argmin(np.abs(positives - 8000)
-                positives_scaled=positives*1000000/len(golds_for_eval)
-
-                #at_risk=(at_risk*1000000)/len(golds_for_eval)
+                at_risk=positives*1000000/len(golds_for_eval)
                 RR=np.divide(precisions2,incidence_ratio)
-                RR_flip=np.flip(RR)
 
                 # Plot ROC curve
                 plt.figure()
@@ -252,7 +239,7 @@ if __name__ == "__main__":
 
                 # plot relative risk  curve
                 plt.figure()
-                plt.plot(positives_scaled, RR_flip, color='blue', lw=2,
+                plt.plot(at_risk, RR, color='blue', lw=2,
                             label='RR curve')
                 plt.xlim([300, 200000])
                 plt.ylim([0.0, 250])
