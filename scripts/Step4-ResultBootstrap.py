@@ -195,8 +195,6 @@ if __name__ == "__main__":
                 precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(golds_for_eval, probs_for_eval,
                                                                                 pos_label=1)
                 print("analyzing month in test set...")
-                #print(month)
-                #print(len(probs_for_eval))
 
                 auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
                 auc_prc = sklearn.metrics.auc(recalls, precisions)
@@ -204,12 +202,21 @@ if __name__ == "__main__":
                 print("incidence")
                 incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
 
-                #count how many people are at risk with prediction > thresholds
-                at_risk=np.array([])
-                for i in range(len(thresholds)):
-                    at_risk=np.append(at_risk,np.sum(probs_for_eval>thresholds[i]))
+                fps, tps, thresholds2 = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
 
-                at_risk=(at_risk*1000000)/len(golds_for_eval)
+                if(thresholds2==tresholds):
+                    print("juhu")
+                positives=fps+tps
+                #index=[]
+                #index[0] = np.argmin(np.abs(positives - 250))
+                #index[1] = np.argmin(np.abs(positives - 500))
+                #index[2] = np.argmin(np.abs(positives - 1000))
+                #index[3] = np.argmin(np.abs(positives - 2000))
+                #index[4] = np.argmin(np.abs(positives - 4000))
+                #index[5] = np.argmin(np.abs(positives - 8000)
+                positives_scaled=positives*1000000/len(golds_for_eval)
+
+                #at_risk=(at_risk*1000000)/len(golds_for_eval)
                 RR=np.divide(precisions,incidence_ratio)
                 RR_flip=np.flip(RR)
 
@@ -244,7 +251,7 @@ if __name__ == "__main__":
 
                 # plot relative risk  curve
                 plt.figure()
-                plt.plot(risk, RR_flip, color='blue', lw=2,
+                plt.plot(positives_scaled, RR_flip, color='blue', lw=2,
                             label='RR curve')
                 plt.xlim([300, 200000])
                 plt.ylim([0.0, 250])
