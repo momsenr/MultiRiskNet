@@ -1,5 +1,5 @@
 from cancerrisknet.datasets.factory import RegisterDataset, UNK_TOKEN, PAD_TOKEN
-from cancerrisknet.datasets.filter_hdf5 import get_avai_trajectory_indices
+from cancerrisknet.datasets.filter import get_avai_trajectory_indices
 from torch.utils import data
 from cancerrisknet.utils.date import parse_date
 from cancerrisknet.utils.parsing import get_code, md5, load_data_settings
