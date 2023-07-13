@@ -75,7 +75,7 @@ def get_dataset(args):
         Generate torch-compatible dataset instances for training, evaluation or any other analysis.
     """
     # Depending on arg, build dataset
-    if (not args.metadata_path.endswith('.h5'):
+    if (not args.metadata_path.endswith('.h5')):
         raise Exception("Metadata file must be in hdf5 format")
 
     dataset_class = get_dataset_class(args)
