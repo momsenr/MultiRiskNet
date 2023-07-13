@@ -98,6 +98,10 @@ for k, metadata_path in enumerate(metadata_paths):
             vocab_path = os.path.join(
                 os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.pickle', '-vocab.txt')
             )
+        elif metadata_path.endswith('.h5'):
+            vocab_path = os.path.join(
+                os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.h5', '-vocab.txt')
+            )
         else:
             print("[Step1-CheckFiles][3/3]{} Metadata {} not supported. Aborting.".format(idx, metadata_path))
             sys.exit(1)
@@ -114,10 +118,17 @@ for k, metadata_path in enumerate(metadata_paths):
             idx, metadata_path
         ))
         codes = set()
-        for pt in metadata:
-            codes.update(set([event['codes'] for event in metadata[pt]['events']]))
 
-        codes = list(codes)
+        if metadata_path.endswith('.h5'):
+            #load dataframe containin all diagnosis codes
+            diagnosis_codes = pd.read_hdf(metadata_path, 'diagnosis')
+            # Extracting the 'codes' column from the DataFrame as a list
+            codes = df['codes'].tolist()
+        else:
+            for pt in metadata:
+                codes.update(set([event['codes'] for event in metadata[pt]['events']]))
+            codes = list(codes)
+
         codes.sort()
         with open(vocab_path, 'w') as f:
             [f.write(c + '\n') for c in codes]
