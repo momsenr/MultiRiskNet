@@ -80,12 +80,13 @@ def get_dataset(args):
 
     dataset_class = get_dataset_class(args)
 
-    data_hdf5_file = args.metadata_path
-    if 'patients_with_valid_trajectories' in pd.HDFStore(data_hdf5_file).keys():
+    datafile = pd.HDFStore(args.metadata_path)
+    if 'patients_with_valid_trajectories' in datafile.keys():
         preprocess=False
     else:
         preprocess=True
-
+    datafile.close()
+     
     train = dataset_class(args, 'train',args.metadata_path, preprocess) if args.train else []
     dev = dataset_class(args, 'dev',args.metadata_path, preprocess) if args.train or args. dev else []
     test = dataset_class(args, 'test',args.metadata_path, preprocess) if args.test else []
