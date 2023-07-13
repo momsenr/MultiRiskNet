@@ -86,9 +86,9 @@ def get_dataset(args):
     else:
         preprocess=True
 
-    train = dataset_class(metadata, args, 'train',args.metadata_path, preprocess) if args.train else []
-    dev = dataset_class(metadata, args, 'dev',args.metadata_path, preprocess) if args.train or args. dev else []
-    test = dataset_class(metadata, args, 'test',args.metadata_path, preprocess) if args.test else []
+    train = dataset_class(args, 'train',args.metadata_path, preprocess) if args.train else []
+    dev = dataset_class(args, 'dev',args.metadata_path, preprocess) if args.train or args. dev else []
+    test = dataset_class(args, 'test',args.metadata_path, preprocess) if args.test else []
 
     if args.attribute:
         attr = dataset_class(metadata, args, 'test')
