@@ -10,6 +10,7 @@ import pkg_resources
 import warnings
 import orjson
 import pickle
+import pandas as pd
 
 # Step 1: Check package and update if needed
 print("[Step1-CheckFiles][1/3] Checking python environment and version...")
@@ -98,6 +99,10 @@ for k, metadata_path in enumerate(metadata_paths):
             vocab_path = os.path.join(
                 os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.pickle', '-vocab.txt')
             )
+        elif metadata_path.endswith('.h5'):
+            vocab_path = os.path.join(
+                os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.h5', '-vocab.txt')
+            )
         else:
             print("[Step1-CheckFiles][3/3]{} Metadata {} not supported. Aborting.".format(idx, metadata_path))
             sys.exit(1)
@@ -114,10 +119,17 @@ for k, metadata_path in enumerate(metadata_paths):
             idx, metadata_path
         ))
         codes = set()
-        for pt in metadata:
-            codes.update(set([event['codes'] for event in metadata[pt]['events']]))
 
+        if metadata_path.endswith('.h5'):
+            #load dataframe containin all diagnosis codes
+            diagnosis = pd.read_hdf(metadata_path, 'diagnosis')
+            # Extracting the 'codes' column from the DataFrame as a list
+            codes = set(diagnosis['codes'])
+        else:
+            for pt in metadata:
+                codes.update(set([event['codes'] for event in metadata[pt]['events']]))
         codes = list(codes)
+
         codes.sort()
         with open(vocab_path, 'w') as f:
             [f.write(c + '\n') for c in codes]
