@@ -37,12 +37,12 @@ class DiseaseProgressionDataset(data.Dataset):
         self.data_hdf5_file= data_hdf5_file
         self.SETTINGS = load_data_settings(args)['SETTINGS']
 
-        self.patients = pd.load_hdf(self.data_hdf5_file, key='patients')
+        self.patients = pd.read_hdf(self.data_hdf5_file, key='patients')
 
         if(preprocess_data==True):
             self.process_patient_data()
         else:
-            self.patients_with_valid_trajectories= pd.load_hdf(self.data_hdf5_file, key='patients_with_valid_trajectories')
+            self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='patients_with_valid_trajectories')
 
     def process_patient_data(self):
         """
