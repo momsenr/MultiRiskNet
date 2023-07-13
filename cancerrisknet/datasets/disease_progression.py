@@ -53,13 +53,15 @@ class DiseaseProgressionDataset(data.Dataset):
         self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'events', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'avai_indices', 'y'])
         self.valid_trajectories_df = pd.DataFrame(columns=['patient_id', 'admit_date',"code","is_valid_idx"])
 
-        for patient in tqdm.tqdm(self.patients.iterrows()):
-            patient_dict = {'patient_id': patient}
-            if self.split_group != 'all' and patient['split_group'] != self.split_group:
+        for patient in tqdm.tqdm(self.patients.itertuples(index=False)):
+            print(patient)
+            patient_dict = {'patient_id': patient.patient_id}
+            if self.split_group != 'all' and patient.split_group != self.split_group:
                 continue
-
-            obs_time_end = patient["end_of_observation_period"]
-            dob = patient["year_of_birth"]+"-01-01"
+            
+            #Todo: move out of this and vectorize
+            obs_time_end = str(patient.end_of_observation_period).split[0]
+            dob = str(patient.year_of_birth)+"-01-01"
 
             #load events from hdf5 file
             events_df = pd.read_hdf(self.data_hdf5_file, 'diagnosis', where='index=='+patient['patient_id'])
@@ -72,7 +74,7 @@ class DiseaseProgressionDataset(data.Dataset):
             patient_dict.update({'future_panc_cancer': future_panc_cancer,
                                  'dob': dob,
                                  'outcome_date': outcome_date,
-                                 'split_group': patient['split_group'],
+                                 'split_group': patient.split_group],
                                  'obs_time_end': obs_time_end})
 
             valid_trajectories_df, gold = get_avai_trajectory_df(patient_dict, events, args)
