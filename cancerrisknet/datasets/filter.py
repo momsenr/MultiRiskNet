@@ -53,7 +53,8 @@ def is_valid_trajectory(events_to_date, outcome_date, future_panc_cancer, args):
         return False
 
     # Filter (2-3)
-    is_pos_pre_cancer = events_to_date.iloc[-1]['admit_date'] < outcome_date
+    #todo: vectorize date conversion
+    is_pos_pre_cancer = events_to_date.iloc[-1]['admit_date']< outcome_date
     is_pos_in_time_horizon = (outcome_date - events_to_date.iloc[-1]['admit_date']).days < max(args.month_endpoints) * 30
     is_valid_pos = future_panc_cancer and is_pos_pre_cancer and is_pos_in_time_horizon
 
