@@ -59,7 +59,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 continue
             
             #Todo: move out of this and vectorize
-            obs_time_end = str(patient.observation_period_end_date).split()[0]
+            obs_time_end = patient.observation_period_end_date
             dob = str(patient.year_of_birth)+"-01-01"
 
             #load events from hdf5 file
@@ -76,7 +76,7 @@ class DiseaseProgressionDataset(data.Dataset):
                                  'split_group': patient.split_group,
                                  'obs_time_end': obs_time_end})
 
-            valid_trajectories_df, gold = get_avai_trajectory_df(patient_dict, events, args)
+            valid_trajectories_df, gold = get_avai_trajectory_indices(patient_dict, events_df, self.args)
             patient_dict.update({'y': gold})
 
             if(valid_trajectories_df['is_valid_idx'].sum()!=0):
@@ -221,7 +221,7 @@ class DiseaseProgressionDataset(data.Dataset):
         occurrence time or the end of trajectory. If multiple cancer events exist, use the first diagnosis date.
 
         Args:
-            events: A pandas df where each row must have a icd_code and admit_date.
+            events: A pandas df where each row must have a code and admit_date.
             end_of_date: The date for the death for the patient or the end date for
                          the entire dataset (e.g. the patient is still alive).
 
@@ -234,7 +234,7 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         if end_of_date is None:
             end_of_date = self.SETTING.END_OF_TIME_DATE
-        panc_ca_events = events[events['icd_code'].isin(self.SETTINGS.PANC_CANCER_CODE)]
+        panc_ca_events = events[events['code'].isin(self.SETTINGS.PANC_CANCER_CODE)]
 
         if not panc_ca_events.empty:
             ever_develops_panc_cancer = True
