@@ -8,6 +8,7 @@ from collections import Counter
 import numpy as np
 import random
 import pandas as pd
+from datetime import datetime
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
@@ -39,6 +40,11 @@ class DiseaseProgressionDataset(data.Dataset):
 
         self.patients = pd.read_hdf(self.data_hdf5_file, key='patients')
 
+        #this conversion is necessary, see https://stackoverflow.com/questions/39278042/storing-pure-python-datetime-datetime-in-pandas-dataframe
+        #by this we force datetime time (instead of pandas timestamp)
+        arr_date= self.patients['observation_period_end_date'].dt.to_pydatetime()
+        self.patients['observation_period_end_date']= pd.Series(arr_date, dtype=object)
+        
         if(preprocess_data==True):
             self.process_patient_data()
         else:
@@ -48,12 +54,16 @@ class DiseaseProgressionDataset(data.Dataset):
         """
             Process patient data and extract valid trajectories.
         """
-
+        #load all events into memory
+        events = pd.read_hdf(self.data_hdf5_file, 'diagnosis')
+        
         #create new pandas dataframe in which we store the metadata
-        self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'events', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'avai_indices', 'y'])
+        self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'y'])
         self.valid_trajectories_df = pd.DataFrame(columns=['patient_id', 'admit_date',"code","is_valid_idx"])
 
+        count=0
         for patient in tqdm.tqdm(self.patients.itertuples(index=False)):
+
             patient_dict = {'patient_id': patient.patient_id}
             if self.split_group != 'all' and patient.split_group != self.split_group:
                 continue
@@ -62,11 +72,10 @@ class DiseaseProgressionDataset(data.Dataset):
             obs_time_end = patient.observation_period_end_date
             dob = str(patient.year_of_birth)+"-01-01"
 
-            #load events from hdf5 file
-            events_df = pd.read_hdf(self.data_hdf5_file, 'diagnosis', where='index=='+str(patient.patient_id))
-
+            events_df = events.loc[[patient.patient_id]]
             # the next line only is relevant if we base the analysis on known risk factors only
             #events = self.process_events(events_raw)
+            arr_date= events_df['admit_date'].dt.to_pydatetime()
 
             future_panc_cancer, outcome_date = self.get_outcome_date(events_df, end_of_date=obs_time_end)
 
@@ -75,8 +84,7 @@ class DiseaseProgressionDataset(data.Dataset):
                                  'outcome_date': outcome_date,
                                  'split_group': patient.split_group,
                                  'obs_time_end': obs_time_end})
-
-            valid_trajectories_df, gold = get_avai_trajectory_indices(patient_dict, events_df, self.args)
+            valid_trajectories_df, gold = get_avai_trajectory_indices(patient_dict, events_df, arr_date, self.args)
             patient_dict.update({'y': gold})
 
             if(valid_trajectories_df['is_valid_idx'].sum()!=0):
@@ -253,8 +261,8 @@ class DiseaseProgressionDataset(data.Dataset):
         samples = self.get_trajectory(patient)
         items = []
         for sample in samples:
-            code_str = " ".join(sample['codes'])
-            x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['codes']]
+            code_str = " ".join(sample['code'])
+            x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['code']]
             time_seq = sample['time_seq'].tolist()
             age_seq = sample['age_seq'].tolist()
             item = {
