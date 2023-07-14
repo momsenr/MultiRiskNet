@@ -19,14 +19,15 @@ def get_avai_trajectory_indices(patient, events, args):
     #add column is_valid_idx to df
     events['is_valid_idx'] = False
 
-    for idx, row in events.iterrows():
+    for idx in range(len(events)):
+        row=events.iloc[idx]
         if patient['future_panc_cancer'] and \
-                (patient['outcome_date'] - row['admit_date']).days <= 30 * args.exclusion_interval:
+                (patient['outcome_date'] - row.admit_date).days <= 30 * args.exclusion_interval:
             continue
 
-        if is_valid_trajectory(events.iloc[:idx+1], patient['outcome_date'], patient['future_panc_cancer'], args):
-            row['is_valid_idx'] = True
-            days_to_censor = (patient['outcome_date'] - row['admit_date']).days
+        if is_valid_trajectory(events.iloc[:idx], patient['outcome_date'], patient['future_panc_cancer'], args):
+            row.is_valid_idx = True
+            days_to_censor = (patient['outcome_date'] - row.admit_date).days
             y = (days_to_censor < (max(args.month_endpoints) * 30) and patient['future_panc_cancer']) or y
 
     return events, y
