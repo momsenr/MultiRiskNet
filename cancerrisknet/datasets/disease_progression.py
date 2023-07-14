@@ -42,8 +42,8 @@ class DiseaseProgressionDataset(data.Dataset):
 
         #this conversion is necessary, see https://stackoverflow.com/questions/39278042/storing-pure-python-datetime-datetime-in-pandas-dataframe
         #by this we force datetime time (instead of pandas timestamp)
-        self.arr_date_patients= self.patients['observation_period_end_date'].dt.to_pydatetime()
-        self.patients['observation_period_end_date_tf']= pd.Series(self.arr_date_patients, dtype=object)
+        #self.arr_date_patients= self.patients['observation_period_end_date'].dt.to_pydatetime()
+        #self.patients['observation_period_end_date_tf']= pd.Series(self.arr_date_patients, dtype=object)
         
         if(preprocess_data==True):
             self.process_patient_data()
@@ -56,18 +56,21 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         #load all events into memory
         events = pd.read_hdf(self.data_hdf5_file, 'diagnosis')
-        
+        count=0
         #create new pandas dataframe in which we store the metadata
         self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'y'])
         self.valid_trajectories_df = pd.DataFrame(columns=['admit_date',"code","is_valid_idx"])
         for patient in tqdm.tqdm(self.patients.itertuples(index=True)):
+            count=count+1
+            if(count>198):
+                break
             patient_dict = {'patient_id': patient.patient_id}
             if self.split_group != 'all' and patient.split_group != self.split_group:
                 continue
             
             #Todo: move out of this and vectorize
-            obs_time_end = patient.observation_period_end_date #self.arr_date_patients[idx]
-            dob = str(patient.year_of_birth)+"-01-01"
+            obs_time_end = patient.observation_period_end_date#self.arr_date_patients[idx]
+            dob = parse_date(str(patient.year_of_birth)+"-01-01")
 
             events_df = events.loc[[patient.patient_id]]
             # the next line only is relevant if we base the analysis on known risk factors only
@@ -87,8 +90,9 @@ class DiseaseProgressionDataset(data.Dataset):
                 self.valid_trajectories_df=self.valid_trajectories_df.append(valid_trajectories_df)
                 self.patients_with_valid_trajectories=self.patients_with_valid_trajectories.append(patient_dict,ignore_index=True)
         
+        self.valid_trajectories_df["is_valid_idx"]=self.valid_trajectories_df["is_valid_idx"].astype('bool')  
         self.valid_trajectories_df.to_hdf(self.data_hdf5_file, key='valid_trajectories_df'+self.split_group, mode='a', format='table')
-        total_positive = self.patients['y'].sum()
+        total_positive = self.patients_with_valid_trajectories['y'].sum()
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
 
@@ -164,7 +168,7 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         Calculates the weights used by WeightedRandomSampler for balancing the batches.
         """
-        ys = self.patients['y']
+        ys = self.patients_with_valid_trajectories['y']
         label_counts = Counter(ys)
         weight_per_label = 1. / len(label_counts)
         label_weights = {
