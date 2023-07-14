@@ -42,8 +42,8 @@ class DiseaseProgressionDataset(data.Dataset):
 
         #this conversion is necessary, see https://stackoverflow.com/questions/39278042/storing-pure-python-datetime-datetime-in-pandas-dataframe
         #by this we force datetime time (instead of pandas timestamp)
-        arr_date= self.patients['observation_period_end_date'].dt.to_pydatetime()
-        self.patients['observation_period_end_date']= pd.Series(arr_date, dtype=object)
+        self.arr_date_patients= self.patients['observation_period_end_date'].dt.to_pydatetime()
+        self.patients['observation_period_end_date_tf']= pd.Series(self.arr_date_patients, dtype=object)
         
         if(preprocess_data==True):
             self.process_patient_data()
@@ -59,17 +59,14 @@ class DiseaseProgressionDataset(data.Dataset):
         
         #create new pandas dataframe in which we store the metadata
         self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'y'])
-        self.valid_trajectories_df = pd.DataFrame(columns=['patient_id', 'admit_date',"code","is_valid_idx"])
-
-        count=0
-        for patient in tqdm.tqdm(self.patients.itertuples(index=False)):
-
+        self.valid_trajectories_df = pd.DataFrame(columns=['admit_date',"code","is_valid_idx"])
+        for patient in tqdm.tqdm(self.patients.itertuples(index=True)):
             patient_dict = {'patient_id': patient.patient_id}
             if self.split_group != 'all' and patient.split_group != self.split_group:
                 continue
             
             #Todo: move out of this and vectorize
-            obs_time_end = patient.observation_period_end_date
+            obs_time_end = patient.observation_period_end_date #self.arr_date_patients[idx]
             dob = str(patient.year_of_birth)+"-01-01"
 
             events_df = events.loc[[patient.patient_id]]
@@ -86,15 +83,11 @@ class DiseaseProgressionDataset(data.Dataset):
                                  'obs_time_end': obs_time_end})
             valid_trajectories_df, gold = get_avai_trajectory_indices(patient_dict, events_df, arr_date, self.args)
             patient_dict.update({'y': gold})
-
             if(valid_trajectories_df['is_valid_idx'].sum()!=0):
-                self.valid_trajectories_df.append(valid_trajectories_df, ignore_index=True)
-                self.patients_with_valid_trajectories.append(patient_dict, ignore_index=True)
-
-        #save avai_trajectories_df to hdf5 file
-        self.valid_trajectories_df.set_index('patient_id', inplace=True)
-        self.valid_trajectories_df.to_hdf(self.data_hdf5_file, key='valid_trajectories_df'+self.split_group, mode='w', format='table')
-
+                self.valid_trajectories_df=self.valid_trajectories_df.append(valid_trajectories_df)
+                self.patients_with_valid_trajectories=self.patients_with_valid_trajectories.append(patient_dict,ignore_index=True)
+        
+        self.valid_trajectories_df.to_hdf(self.data_hdf5_file, key='valid_trajectories_df'+self.split_group, mode='a', format='table')
         total_positive = self.patients['y'].sum()
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
