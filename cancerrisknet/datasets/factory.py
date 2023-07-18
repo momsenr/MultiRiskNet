@@ -45,14 +45,9 @@ def build_code_to_index_map(args):
         following steps under `scripts/metadata/`.
     """
     print("Building code to index map...")
-    if(args.metadata_path.endswith('.json')):
-        vocab_path = os.path.join(
-            os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.json', '-vocab.txt')
-            )
-    elif(args.metadata_path.endswith('.pickle')):
-        vocab_path = os.path.join(
-            os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.pickle', '-vocab.txt')
-            )
+    vocab_path = os.path.join(
+        os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.h5', '-vocab.txt')
+        )
 
     with open(vocab_path, 'r') as f:
         all_codes = f.readlines()
@@ -80,17 +75,21 @@ def get_dataset(args):
         Generate torch-compatible dataset instances for training, evaluation or any other analysis.
     """
     # Depending on arg, build dataset
-    if args.metadata_path.endswith('.json'):
-        with open(args.metadata_path, 'r') as f:
-            metadata = orjson.loads(f.read())
-    elif args.metadata_path.endswith('.pickle'):
-        metadata = pickle.load(open(args.metadata_path, 'rb'))
+    if (not args.metadata_path.endswith('.h5')):
+        raise Exception("Metadata file must be in hdf5 format")
 
     dataset_class = get_dataset_class(args)
 
-    train = dataset_class(metadata, args, 'train') if args.train else []
-    dev = dataset_class(metadata, args, 'dev') if args.train or args. dev else []
-    test = dataset_class(metadata, args, 'test') if args.test else []
+    datafile = pd.HDFStore(args.metadata_path)
+    if 'patients_with_valid_trajectories' in datafile.keys():
+        preprocess=False
+    else:
+        preprocess=True
+    datafile.close()
+     
+    train = dataset_class(args, 'train',args.metadata_path, preprocess) if args.train else []
+    dev = dataset_class(args, 'dev',args.metadata_path, preprocess) if args.train or args. dev else []
+    test = dataset_class(args, 'test',args.metadata_path, preprocess) if args.test else []
 
     if args.attribute:
         attr = dataset_class(metadata, args, 'test')

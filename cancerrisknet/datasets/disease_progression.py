@@ -7,8 +7,8 @@ import tqdm
 from collections import Counter
 import numpy as np
 import random
-import pandas as pd
-from datetime import datetime
+import json
+
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
@@ -18,7 +18,7 @@ SUMMARY_MSG = "Constructed disease progression {} dataset with {} records from {
 
 @RegisterDataset("disease_progression")
 class DiseaseProgressionDataset(data.Dataset):
-    def __init__(self, args, split_group, data_hdf5_file, preprocess_data=False):
+    def __init__(self, metadata, args, split_group):
         """
             Dataset for survival analysis based on categorical disease history information.
 
@@ -35,72 +35,35 @@ class DiseaseProgressionDataset(data.Dataset):
         self.args = args
         self.split_group = split_group
         self.PAD_TOKEN = PAD_TOKEN
-        self.data_hdf5_file= data_hdf5_file
+        self.metadata = metadata
+        self.patients = []
         self.SETTINGS = load_data_settings(args)['SETTINGS']
 
-        self.patients = pd.read_hdf(self.data_hdf5_file, key='patients')
+        for patient in tqdm.tqdm(metadata):
+            patient_metadata = {patient: metadata[patient]}
+            patient_dict = {'patient_id': patient}
 
-        #this conversion is necessary, see https://stackoverflow.com/questions/39278042/storing-pure-python-datetime-datetime-in-pandas-dataframe
-        #by this we force datetime time (instead of pandas timestamp)
-        #self.arr_date_patients= self.patients['observation_period_end_date'].dt.to_pydatetime()
-        #self.patients['observation_period_end_date_tf']= pd.Series(self.arr_date_patients, dtype=object)
-        
-        if(preprocess_data==True):
-            self.process_patient_data(save_path='patients_with_valid_trajectories'+self.split_group)
-        else:
-            self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='patients_with_valid_trajectories')
+            if split_group != 'all' and patient_metadata[patient]['split_group'] != split_group:
+                continue
 
-    def process_patient_data(self,save_path=None):
-        """
-            Process patient data and extract valid trajectories.
-        """
-        #load all events into memory
-        self.events = pd.read_hdf(self.data_hdf5_file, 'diagnosis')
+            obs_time_end = parse_date(patient_metadata[patient]['end_of_data'])
+            dob = parse_date(patient_metadata[patient]['birthdate'])
 
-        # the next line only is relevant if we base the analysis on known risk factors only
-        # events = self.process_events(events_raw)
+            events = self.process_events(patient_metadata[patient]['events'])
+            future_panc_cancer, outcome_date = self.get_outcome_date(events, end_of_date=obs_time_end)
+            patient_dict.update({'future_panc_cancer': future_panc_cancer,
+                                 'dob': dob,
+                                 'outcome_date': outcome_date,
+                                 'split_group': patient_metadata[patient]['split_group'],
+                                 'obs_time_end': obs_time_end})
 
-        #create new pandas dataframe in which we store the metadata
-        #self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'y'])
+            avai_indices, gold = get_avai_trajectory_indices(patient_dict, events, args)
+            patient_dict.update({'avai_indices': avai_indices, 'y': gold, 'events': events})
 
-        # Check if the code is '157' or 'C25' and mark it as True, otherwise mark it as False
-        self.events['is_panc_cancer_code'] = self.events['code'].apply(lambda x: True if (x in self.SETTINGS.PANC_CANCER_CODE) else False)
+            if avai_indices:
+                self.patients.append(patient_dict)
 
-        # Get a list of indices where the 'is_panc_cancer_code' is True
-        cancer_patients = list(self.events.loc[self.events.is_panc_cancer_code == True].index.unique())
-
-        # Check if the index is present in the 'cancer_patients' list and mark it as True, otherwise mark it as False
-        self.events['future_panc_cancer_patient'] = np.where(self.events.index.isin(cancer_patients), True, False)
-
-        # Calculate the 'outcome_day' based on conditions using column values
-        # If 'is_panc_cancer_code' is False, set 'outcome_day' as the value of 'observation_period_end_day'
-        # If 'is_panc_cancer_code' is True, set 'outcome_day' as the value of 'admit_date'
-        self.events['outcome_day'] = (1 - self.events['is_panc_cancer_code']) * self.events['observation_period_end_day'] \
-                                     + self.events['is_panc_cancer_code'] * self.events["admit_date"]
-
-        # Group the DataFrame by 'patient_id' and find the minimum 'outcome_day' for each patient
-        self.events['outcome_day'] = self.events.groupby('patient_id')['outcome_day'].min()
-
-        # Drop the 'observation_period_end_day' column from the DataFrame
-        self.events.drop("observation_period_end_day", axis=1, inplace=True)
-
-        # Determine valid trajectories
-        self.events['is_pos_pre_cancer'] = self.events["admit_date"] < self.events['outcome_day']
-        self.events['is_pos_in_time_horizon'] = (self.events["outcome_day"] - self.events['admit_date'] < max(self.args.month_endpoints)  * 30)
-        self.events['is_valid_pos'] = self.events.eval("future_panc_cancer_patient and is_pos_pre_cancer and is_pos_in_time_horizon")
-        self.events['enough_min_followup'] = ((self.events["outcome_day"] - self.events['admit_date']) // 365) >= self.args.min_followup_year_if_neg
-        self.events['is_valid_neg'] = self.events.eval("not future_panc_cancer_patient and enough_min_followup")
-        self.events['is_excluded_traj'] = (self.events['outcome_day'] - self.events['admit_date']) <= 30 * self.args.exclusion_interval
-        self.events['is_valid_traj'] = self.events.eval("(not is_excluded_traj) and (is_valid_neg or is_valid_pos)")
-
-        self.events['y'] = self.events.groupby('patient_id')['is_valid_pos'].max()
-
-        if(save_path is not None):
-            self.events.to_hdf5(self.data_hdf5_file, key=save_path, mode='a')
-
-        patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
-        self.patients_with_valid_trajectories= patients_with_trajectories[patients_with_trajectories['is_valid_traj'] > 0]
-        total_positive = self.patients_with_valid_trajectories['y'].sum()
+        total_positive = sum([p['y'] for p in self.patients])
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
 
@@ -109,6 +72,12 @@ class DiseaseProgressionDataset(data.Dataset):
             Process the diagnosis events depending on the filters. If only known risk factors are used,
             then ICD codes that are not in the subset are replaced with PAD token.
         """
+
+        for event in events:
+            event['admit_date'] = parse_date(event['admdate'])
+
+        events = sorted(events, key=lambda x: x['admit_date'])
+
         if self.args.use_known_risk_factors_only:
             for e in events:
                 if e['codes'] not in self.SETTINGS.KNOWN_RISK_FACTORS and e['codes'] not in self.SETTINGS.PANC_CANCER_CODE:
@@ -120,25 +89,20 @@ class DiseaseProgressionDataset(data.Dataset):
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
 
-        valid_trajectories = pd.read_hdf(self.data_hdf5_file, key='valid_trajectories_df'+self.split_group, where='index=='+patient['patient_id'])
-
-        #find all indices where the patient has a valid trajectory
-        valid_indices = valid_trajectories[valid_trajectories['is_valid_idx']==1].index.tolist()
-
         if self.split_group in ['dev', 'test', 'attribute']:
             if not self.args.no_random_sample_eval_trajectories:
-                selected_idx = [random.choice(valid_indices) for _ in range(self.args.max_eval_indices)]
+                selected_idx = [random.choice(patient['avai_indices']) for _ in range(self.args.max_eval_indices)]
             else:
-                selected_idx = valid_indices[-self.args.max_eval_indices:]
+                selected_idx = patient['avai_indices'][-self.args.max_eval_indices:]
 
         else:
-            selected_idx = [random.choice(valid_indices)]
+            selected_idx = [random.choice(patient['avai_indices'])]
 
         samples = []
         for idx in selected_idx:
-            events_to_date = valid_trajectories[:idx + 1]
+            events_to_date = patient['events'][:idx + 1]
 
-            codes = events_to_date['codes'].tolist()
+            codes = [e['codes'] for e in events_to_date]
             _, time_seq = self.get_time_seq(events_to_date, events_to_date[-1]['admit_date'])
             age, age_seq = self.get_time_seq(events_to_date, patient['dob'])
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(patient, until_idx=idx)
@@ -174,13 +138,13 @@ class DiseaseProgressionDataset(data.Dataset):
 
     def class_count(self):
         """
-        Calculates the weights used by WeightedRandomSampler for balancing the batches.
+            Calculates the weights used by WeightedRandomSampler for balancing the batches. 
         """
-        ys = self.patients_with_valid_trajectories['y']
+        ys = [patient['y'] for patient in self.patients]
         label_counts = Counter(ys)
         weight_per_label = 1. / len(label_counts)
         label_weights = {
-            label: weight_per_label / count for label, count in label_counts.items()
+            label: weight_per_label/count for label, count in label_counts.items()
         }
         self.weights = [label_weights[d] for d in ys]
 
@@ -234,7 +198,7 @@ class DiseaseProgressionDataset(data.Dataset):
         occurrence time or the end of trajectory. If multiple cancer events exist, use the first diagnosis date.
 
         Args:
-            events: A pandas df where each row must have a code and admit_date.
+            events: A list of event dicts. Each dict must have a CODE and admit_date.
             end_of_date: The date for the death for the patient or the end date for
                          the entire dataset (e.g. the patient is still alive).
 
@@ -247,27 +211,27 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         if end_of_date is None:
             end_of_date = self.SETTING.END_OF_TIME_DATE
-        panc_ca_events = events[events['code'].isin(self.SETTINGS.PANC_CANCER_CODE)]
+        panc_ca_events = [e for e in events if any(icd == e['codes'] for icd in self.SETTINGS.PANC_CANCER_CODE)]
 
-        if not panc_ca_events.empty:
+        if len(panc_ca_events) > 0:
             ever_develops_panc_cancer = True
-            time = panc_ca_events['admit_date'].min()
+            time = min([e['admit_date'] for e in panc_ca_events])
         else:
             ever_develops_panc_cancer = False
             time = end_of_date
         return ever_develops_panc_cancer, time
 
     def __len__(self):
-        return len(self.patients_with_valid_trajectories)
+        return len(self.patients)
 
     def __getitem__(self, index):
 
-        patient = self.patients_with_valid_trajectories[index]
+        patient = self.patients[index]
         samples = self.get_trajectory(patient)
         items = []
         for sample in samples:
-            code_str = " ".join(sample['code'])
-            x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['code']]
+            code_str = " ".join(sample['codes'])
+            x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['codes']]
             time_seq = sample['time_seq'].tolist()
             age_seq = sample['age_seq'].tolist()
             item = {
