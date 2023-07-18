@@ -67,7 +67,7 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events['is_panc_cancer_code'] = self.events['code'].apply(lambda x: True if (x in self.SETTINGS.PANC_CANCER_CODE) else False)
 
         # Get a list of indices where the 'is_panc_cancer_code' is True
-        cancer_patients = list(self.events.loc[events.is_panc_cancer_code == True].index.unique())
+        cancer_patients = list(self.events.loc[self.events.is_panc_cancer_code == True].index.unique())
 
         # Check if the index is present in the 'cancer_patients' list and mark it as True, otherwise mark it as False
         self.events['future_panc_cancer_patient'] = np.where(self.events.index.isin(cancer_patients), True, False)
