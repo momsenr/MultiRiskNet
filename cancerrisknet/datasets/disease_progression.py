@@ -84,7 +84,18 @@ class DiseaseProgressionDataset(data.Dataset):
         # Drop the 'observation_period_end_day' column from the DataFrame
         self.events.drop("observation_period_end_day", axis=1, inplace=True)
 
-        # Determine valid trajectories
+        """
+        The next block checks which trajectories are valid. A trajectory is valid if:
+        If the patient is a cancer patient:
+         (1) The trajectory must end before the pancreatic cancer event.
+         (2) The cancer event must occurr within the certain time after the time of assessment.
+
+        Or if the patient is not a cancer patient:
+         (3) The trajectory must end at least args.min_followup_year_if_neg before the end of the dataset
+             to exclude those cancer patients died of other reasons with the cancer undetected.
+        
+        Furthermore, the trajectorie must contain enough events (which we check later)
+        """
         self.events['is_pos_pre_cancer'] = self.events["admit_date"] < self.events['outcome_day']
         self.events['is_pos_in_time_horizon'] = (self.events["outcome_day"] - self.events['admit_date'] < max(self.args.month_endpoints)  * 30)
         self.events['is_valid_pos'] = self.events.eval("future_panc_cancer_patient and is_pos_pre_cancer and is_pos_in_time_horizon")
@@ -93,6 +104,7 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events['is_excluded_traj'] = (self.events['outcome_day'] - self.events['admit_date']) <= 30 * self.args.exclusion_interval
         self.events['is_valid_traj'] = self.events.eval("(not is_excluded_traj) and (is_valid_neg or is_valid_pos)")
 
+        # y indicates whether any of the trajectories include a cancer diagnosis.
         self.events['y'] = self.events.groupby('patient_id')['is_valid_pos'].max()
 
         if(save_path is not None):
