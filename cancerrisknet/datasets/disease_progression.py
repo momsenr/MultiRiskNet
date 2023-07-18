@@ -46,52 +46,60 @@ class DiseaseProgressionDataset(data.Dataset):
         #self.patients['observation_period_end_date_tf']= pd.Series(self.arr_date_patients, dtype=object)
         
         if(preprocess_data==True):
-            self.process_patient_data()
+            self.process_patient_data(save_path='patients_with_valid_trajectories'+self.split_group)
         else:
             self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='patients_with_valid_trajectories')
 
-    def process_patient_data(self):
+    def process_patient_data(self,save_path=None):
         """
             Process patient data and extract valid trajectories.
         """
         #load all events into memory
-        events = pd.read_hdf(self.data_hdf5_file, 'diagnosis')
-        count=0
+        self.events = pd.read_hdf(self.data_hdf5_file, 'diagnosis')
+
+        # the next line only is relevant if we base the analysis on known risk factors only
+        # events = self.process_events(events_raw)
+
         #create new pandas dataframe in which we store the metadata
-        self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'y'])
-        self.valid_trajectories_df = pd.DataFrame(columns=['admit_date',"code","is_valid_idx"])
-        for patient in tqdm.tqdm(self.patients.itertuples(index=True)):
-            count=count+1
-            if(count>198):
-                break
-            patient_dict = {'patient_id': patient.patient_id}
-            if self.split_group != 'all' and patient.split_group != self.split_group:
-                continue
-            
-            #Todo: move out of this and vectorize
-            obs_time_end = patient.observation_period_end_date#self.arr_date_patients[idx]
-            dob = parse_date(str(patient.year_of_birth)+"-01-01")
+        #self.patients_with_valid_trajectories = pd.DataFrame(columns=['patient_id', 'dob', 'future_panc_cancer', 'outcome_date', 'obs_time_end', 'y'])
 
-            events_df = events.loc[[patient.patient_id]]
-            # the next line only is relevant if we base the analysis on known risk factors only
-            #events = self.process_events(events_raw)
-            arr_date= events_df['admit_date'].dt.to_pydatetime()
+        # Check if the code is '157' or 'C25' and mark it as True, otherwise mark it as False
+        self.events['is_panc_cancer_code'] = self.events['code'].apply(lambda x: True if (x in self.SETTINGS.PANC_CANCER_CODE) else False)
 
-            future_panc_cancer, outcome_date = self.get_outcome_date(events_df, end_of_date=obs_time_end)
+        # Get a list of indices where the 'is_panc_cancer_code' is True
+        cancer_patients = list(self.events.loc[self.events.is_panc_cancer_code == True].index.unique())
 
-            patient_dict.update({'future_panc_cancer': future_panc_cancer,
-                                 'dob': dob,
-                                 'outcome_date': outcome_date,
-                                 'split_group': patient.split_group,
-                                 'obs_time_end': obs_time_end})
-            valid_trajectories_df, gold = get_avai_trajectory_indices(patient_dict, events_df, arr_date, self.args)
-            patient_dict.update({'y': gold})
-            if(valid_trajectories_df['is_valid_idx'].sum()!=0):
-                self.valid_trajectories_df=self.valid_trajectories_df.append(valid_trajectories_df)
-                self.patients_with_valid_trajectories=self.patients_with_valid_trajectories.append(patient_dict,ignore_index=True)
-        
-        self.valid_trajectories_df["is_valid_idx"]=self.valid_trajectories_df["is_valid_idx"].astype('bool')  
-        self.valid_trajectories_df.to_hdf(self.data_hdf5_file, key='valid_trajectories_df'+self.split_group, mode='a', format='table')
+        # Check if the index is present in the 'cancer_patients' list and mark it as True, otherwise mark it as False
+        self.events['future_panc_cancer_patient'] = np.where(self.events.index.isin(cancer_patients), True, False)
+
+        # Calculate the 'outcome_day' based on conditions using column values
+        # If 'is_panc_cancer_code' is False, set 'outcome_day' as the value of 'observation_period_end_day'
+        # If 'is_panc_cancer_code' is True, set 'outcome_day' as the value of 'admit_date'
+        self.events['outcome_day'] = (1 - self.events['is_panc_cancer_code']) * self.events['observation_period_end_day'] \
+                                     + self.events['is_panc_cancer_code'] * self.events["admit_date"]
+
+        # Group the DataFrame by 'patient_id' and find the minimum 'outcome_day' for each patient
+        self.events['outcome_day'] = self.events.groupby('patient_id')['outcome_day'].min()
+
+        # Drop the 'observation_period_end_day' column from the DataFrame
+        self.events.drop("observation_period_end_day", axis=1, inplace=True)
+
+        # Determine valid trajectories
+        self.events['is_pos_pre_cancer'] = self.events["admit_date"] < self.events['outcome_day']
+        self.events['is_pos_in_time_horizon'] = (self.events["outcome_day"] - self.events['admit_date'] < max(self.args.month_endpoints)  * 30)
+        self.events['is_valid_pos'] = self.events.eval("future_panc_cancer_patient and is_pos_pre_cancer and is_pos_in_time_horizon")
+        self.events['enough_min_followup'] = ((self.events["outcome_day"] - self.events['admit_date']) // 365) >= self.args.min_followup_year_if_neg
+        self.events['is_valid_neg'] = self.events.eval("not future_panc_cancer_patient and enough_min_followup")
+        self.events['is_excluded_traj'] = (self.events['outcome_day'] - self.events['admit_date']) <= 30 * self.args.exclusion_interval
+        self.events['is_valid_traj'] = self.events.eval("(not is_excluded_traj) and (is_valid_neg or is_valid_pos)")
+
+        self.events['y'] = self.events.groupby('patient_id')['is_valid_pos'].max()
+
+        if(save_path is not None):
+            self.events.to_hdf(self.data_hdf5_file, key=save_path, mode='a')
+
+        patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
+        self.patients_with_valid_trajectories= patients_with_trajectories[patients_with_trajectories['is_valid_traj'] > 0]
         total_positive = self.patients_with_valid_trajectories['y'].sum()
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
