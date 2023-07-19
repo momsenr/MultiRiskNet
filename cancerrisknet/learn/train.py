@@ -39,12 +39,12 @@ def train_model(train_data, dev_data, model, args):
         for mode, data_loader in [('Train', train_data_loader), ('Dev', dev_data_loader)]:
             if_train = mode == 'Train'
             key_prefix = mode.lower()
-            loss,  golds, patient_golds, preds, probs, exams, pids, censor_times, days_to_final_censors, dates = \
+            loss,  golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
                           optimizers=optimizers, args=args)
             logger_epoch.log("Run epoch ({})".format(key_prefix))
 
-            log_statement, epoch_stats, _ = compute_eval_metrics(args, loss, golds, patient_golds, probs, exams,
+            log_statement, epoch_stats, _ = compute_eval_metrics(args, loss, golds, patient_golds, probs,
                                                                  pids, dates, censor_times, days_to_final_censors,
                                                                  epoch_stats, key_prefix)
             logger_epoch.log("Compute eval metrics ({})".format(key_prefix))
@@ -122,7 +122,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
     golds = []
     patient_golds = []
     losses = []
-    exams = []
+    #exams = []
     pids = []
     logger = TimeLogger(args, args.time_logger_step) if args.time_logger_verbose >= 3 else TimeLogger(args, 0)
 
@@ -158,7 +158,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
         step_results = model_step(batch, models, train, args)
 
-        loss, batch_preds, batch_probs, batch_golds, batch_patient_golds, batch_exams, batch_pids, batch_censors, \
+        loss, batch_preds, batch_probs, batch_golds, batch_patient_golds, batch_pids, batch_censors, \
             batch_days_to_censor, batch_dates = step_results
         batch_loss += loss.cpu().data.item()
         logger.log("model step")
@@ -178,7 +178,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         dates.extend(batch_dates)
         censor_times.extend(batch_censors)
         days_to_final_censors.extend(batch_days_to_censor)
-        exams.extend(batch_exams)
+        #exams.extend(batch_exams)
         pids.extend(batch_pids)
         logger.log("saving results")
 
@@ -191,7 +191,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
     avg_loss = np.mean(losses)
 
-    return avg_loss, golds, patient_golds, preds, probs, exams, pids, censor_times, days_to_final_censors, dates
+    return avg_loss, golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates
 
 
 def prepare_batch(batch, args):
@@ -220,7 +220,7 @@ def eval_model(eval_data, name, models, args):
     data_loader = get_dataset_loader(args, eval_data)
     logger_eval.log('Load eval data')
 
-    loss, golds, patient_golds, preds, probs, exams, pids, censor_times, days_to_final_censors, dates = run_epoch(
+    loss, golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates = run_epoch(
         data_loader,
         train=False,
         truncate_epoch=(not args.exhaust_dataloader and eval_data.split_group != 'test'),
@@ -232,7 +232,7 @@ def eval_model(eval_data, name, models, args):
 
     log_statement, eval_stats, eval_preds = compute_eval_metrics(
                             args, loss,
-                            golds, patient_golds, probs, exams, pids, dates,
+                            golds, patient_golds, probs, pids, dates,
                             censor_times, days_to_final_censors, eval_stats, name)
     print(log_statement)
     logger_eval.log('Compute eval metrics')

@@ -28,7 +28,7 @@ def get_probs_golds(test_preds, index=4):
     return probs_for_eval, golds_for_eval
 
 
-def compute_eval_metrics(args, loss, golds, patient_golds, probs, exams, pids, dates, censor_times,
+def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, censor_times,
                          days_to_final_censors, stats_dict, key_prefix):
     
     stats_dict['{}_loss'.format(key_prefix)].append(loss)
@@ -36,7 +36,6 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, exams, pids, d
         'golds': golds,
         'probs': probs,
         'patient_golds': patient_golds,
-        'exams': exams,
         'pids': pids,
         'dates': dates,
         'censor_times': censor_times,
