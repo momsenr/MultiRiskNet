@@ -55,7 +55,7 @@ if __name__ == '__main__':
     else:
         models = {args.model_name: model}
 
-    loss, golds, gold_seqs, patient_golds, preds, probs, exams, pids, censor_times, days_to_final_censors, dates = train.run_epoch(
+    loss, golds, gold_seqs, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates = train.run_epoch(
         data_loader,
         train=False,
         truncate_epoch=False,  # (not args.exhaust_dataloader and eval_data.split_group != 'test'),
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     log_statement, eval_stats, eval_preds = eval.compute_eval_metrics(
             args, loss,
-            golds, patient_golds, probs, exams, pids, dates,
+            golds, patient_golds, probs, pids, dates,
             censor_times, days_to_final_censors, eval_stats, name)
     print(log_statement)
 
@@ -86,7 +86,6 @@ if __name__ == '__main__':
     print("probs")
     print(probs)
 
-    print("exams")
     print(exams)
     print("pids")
     print(pids)
