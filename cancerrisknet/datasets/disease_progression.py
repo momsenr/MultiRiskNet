@@ -41,16 +41,16 @@ class DiseaseProgressionDataset(data.Dataset):
         self.patients = pd.read_hdf(self.data_hdf5_file, key='patients')
 
         if(preprocess_data==True):
-            self.process_patient_data(save_path='valid_trajectories-'+self.split_group)
+            self.process_patient_data(save_path='valid_trajectories_'+self.split_group)
         else:
-            self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='valid_trajectories-'+self.split_group)
+            self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='valid_trajectories_'+self.split_group)
 
     def process_patient_data(self,save_path=None):
         """
             Process patient data and extract valid trajectories.
         """
         #load all events belonging to our split group into memory
-        self.events = pd.read_hdf(self.data_hdf5_file, 'diagnosis-'+self.split_group)
+        self.events = pd.read_hdf(self.data_hdf5_file, 'diagnosis_'+self.split_group)
 
         # the next line only is relevant if we base the analysis on known risk factors only
         # events = self.process_events(events_raw)
