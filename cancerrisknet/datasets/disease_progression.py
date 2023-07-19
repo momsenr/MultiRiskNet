@@ -41,16 +41,16 @@ class DiseaseProgressionDataset(data.Dataset):
         self.patients = pd.read_hdf(self.data_hdf5_file, key='patients')
 
         if(preprocess_data==True):
-            self.process_patient_data(save_path='patients_with_valid_trajectories'+self.split_group)
+            self.process_patient_data(save_path='valid_trajectories-'+self.split_group)
         else:
-            self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='patients_with_valid_trajectories'+self.split_group)
+            self.patients_with_valid_trajectories= pd.read_hdf(self.data_hdf5_file, key='valid_trajectories-'+self.split_group)
 
     def process_patient_data(self,save_path=None):
         """
             Process patient data and extract valid trajectories.
         """
-        #load all events belonging to our split groupinto memory
-        self.events = pd.read_hdf(self.data_hdf5_file, 'diagnosis', where='split_group == '+self.split_group)
+        #load all events belonging to our split group into memory
+        self.events = pd.read_hdf(self.data_hdf5_file, 'diagnosis-'+self.split_group)
 
         # the next line only is relevant if we base the analysis on known risk factors only
         # events = self.process_events(events_raw)
@@ -147,7 +147,7 @@ class DiseaseProgressionDataset(data.Dataset):
 
             codes = events_to_date['codes'].tolist()
             _, time_seq = self.get_time_seq(events_to_date, events_to_date[-1]['admit_date'])
-            age, age_seq = self.get_time_seq(events_to_date, (2007-patient['year_of_birth']*365)
+            age, age_seq = self.get_time_seq(events_to_date, (2007-patient['year_of_birth']*365))
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
                 'codes': codes,
