@@ -55,7 +55,7 @@ def parse_args(args_str=None):
                              "If no_random_sample_eval_trajectories=True, use all the trajectories.")
     parser.add_argument('--max_eval_indices', type=int, default=250,
                         help="Max number of trajectories to include for each patient during dev and test. ")
-    parser.add_argument('--load_preprocessed_from_hdf5', type=bool, default=True,
+    parser.add_argument('--load_preprocessed_from_hdf5', action='store_true', default=True,
                         help="If it exists, load the already preprocessed files from the file. If False, preprocessed files will be saved to input file.")
     parser.add_argument('--min_followup_year_if_neg', type=int, default=2,
                         help="Min number of years to be required for a trajectory to count as negative. ")
