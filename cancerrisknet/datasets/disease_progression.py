@@ -129,8 +129,8 @@ class DiseaseProgressionDataset(data.Dataset):
         """
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
-        patient_metadata= self.patients_with_valid_trajectories[patient_index]
-        patient_id= patients_metadat['patient_id']
+        patient_metadata= self.patients_with_valid_trajectories.iloc[patient_index]
+        patient_id= patient_metadata['patient_id']
         patient = self.patients[self.patients.patient_id == patient_id]
         patient_trajectories=self.events[self.events.index == patient_id]
         patient_trajectories.reset_index(inplace=True)
@@ -152,8 +152,8 @@ class DiseaseProgressionDataset(data.Dataset):
             events_to_date = patient_trajectories[:idx + 1]
             last_event = events_to_date.iloc[-1]
 
-            codes = events_to_date['codes'].tolist()
-            _, time_seq = self.get_time_seq(events_to_date, events_to_date[-1]['admit_date'])
+            codes = events_to_date['code'].tolist()
+            _, time_seq = self.get_time_seq(events_to_date, events_to_date.iloc[-1]['admit_date'])
             age, age_seq = self.get_time_seq(events_to_date, (2007-patient['year_of_birth']*365))
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
