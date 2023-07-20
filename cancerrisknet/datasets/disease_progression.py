@@ -132,7 +132,7 @@ class DiseaseProgressionDataset(data.Dataset):
         patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
         patient = self.patients[self.patients.patient_id == patient_id]
 
-        patient_trajectories=self.events[self.events.index == patient_id]
+        patient_trajectories=self.events[self.events.index == patient_id].copy()
         patient_trajectories.reset_index(inplace=True)
 
         #find the indices where the patient has a valid trajectory
@@ -156,13 +156,13 @@ class DiseaseProgressionDataset(data.Dataset):
             events_to_date = patient_trajectories.iloc[:idx + 1].copy()
             last_event = events_to_date.iloc[-1]
 
-            # Calculate deltas using vectorized operations
             events_to_date['deltas_admitdate'] = (last_event['admit_date'] - events_to_date['admit_date']).abs()
 
             codes = events_to_date['code'].tolist()
             
             _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
             age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
+
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
                 'codes': codes,
