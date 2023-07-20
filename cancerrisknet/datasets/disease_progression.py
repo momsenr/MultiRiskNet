@@ -149,9 +149,10 @@ class DiseaseProgressionDataset(data.Dataset):
 
         samples = []
         for idx in selected_idx:
-            events_to_date = patient_trajectories[:idx + 1]
+            #todo: move this copy out
+            events_to_date = patient_trajectories.iloc[:idx + 1].copy()
             last_event = events_to_date.iloc[-1]
-            events_to_date['deltas_admitdate'] = events_to_date['admit_date'].apply(lambda x: abs(events_to_date[-1]["admit_date"] - x))
+            events_to_date['deltas_admitdate'] = events_to_date['admit_date'].apply(lambda x: abs(events_to_date.iloc[-1]["admit_date"] - x))
             events_to_date['deltas_age'] = events_to_date['admit_date'].apply(lambda x: abs((2007-patient['year_of_birth']*365) - x))
             codes = events_to_date['code'].tolist()
             _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
@@ -163,7 +164,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'y_seq': y_seq,
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
-                'future_panc_cancer': last_event['future_panc_cancer'],
+                'future_panc_cancer': last_event['future_panc_cancer_patient'],
                 'patient_id': patient_index,
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
@@ -184,7 +185,7 @@ class DiseaseProgressionDataset(data.Dataset):
         #deltas = np.array(events['deltas'])
         #deltas, multipliers = deltas.reshape(len(deltas), 1), multipliers.reshape(1, len(multipliers))
         #positional_embeddings = np.cos(deltas*multipliers)
-        positional_embeddings = np.cos(events[reference_date_column.values.reshape(-1, 1) * multipliers.reshape(1, -1))
+        positional_embeddings = np.cos(events[reference_date_column].values.reshape(-1, 1) * multipliers.reshape(1, -1))
         return events[reference_date_column].max(), positional_embeddings
 
     def class_count(self):
@@ -233,12 +234,12 @@ class DiseaseProgressionDataset(data.Dataset):
                 y_mask: [1, 1, 1, 1, 0]
         """
 
-        event = events_to_date[until_idx]
-        days_to_censor = event['outcome_date'] - event['admit_date']
+        last_event = events_to_date.iloc[until_idx]
+        days_to_censor = last_event['outcome_day'] - last_event['admit_date']
         num_time_steps= len(self.args.month_endpoints)
-        y = event['is_pos_in_time_horizon'] and event['future_panc_cancer']
+        y = last_event['is_pos_in_time_horizon'] and last_event['future_panc_cancer_patient']
         y_seq = np.zeros(num_time_steps)
-        if event['is_pos_in_time_horizon']:
+        if last_event['is_pos_in_time_horizon']:
             time_at_event = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor < (mo*30)])
         else:
             time_at_event = num_time_steps - 1
@@ -255,12 +256,11 @@ class DiseaseProgressionDataset(data.Dataset):
 
     def __getitem__(self, patient_index):
 
-        #patient = self.patients_with_valid_trajectories[index]
         samples = self.get_trajectory(patient_index)
         items = []
         for sample in samples:
-            code_str = " ".join(sample['code'])
-            x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['code']]
+            code_str = " ".join(sample['codes'])
+            x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['codes']]
             time_seq = sample['time_seq'].tolist()
             age_seq = sample['age_seq'].tolist()
             item = {
