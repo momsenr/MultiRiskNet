@@ -54,6 +54,8 @@ class DiseaseProgressionDataset(data.Dataset):
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
 
+        self.patients_with_valid_trajectories.reset_index(inplace=True)
+
     def process_patient_data(self,save_path=None):
         """
             Process patient data and extract valid trajectories.
@@ -127,10 +129,11 @@ class DiseaseProgressionDataset(data.Dataset):
         """
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
-
-        patient_trajectories=self.events[self.events.index == patient_index]
+        patient_metadata= self.patients_with_valid_trajectories[patient_index]
+        patient_id= patients_metadat['patient_id']
+        patient = self.patients[self.patients.patient_id == patient_id]
+        patient_trajectories=self.events[self.events.index == patient_id]
         patient_trajectories.reset_index(inplace=True)
-        patient=self.patients[self.patients.patient_id == patient_index]
 
         #find the indices where the patient has a valid trajectory
         valid_indices = patient_trajectories[patient_trajectories['is_valid_traj']==True].index.tolist()
