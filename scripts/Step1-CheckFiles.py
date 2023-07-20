@@ -129,7 +129,7 @@ for k, metadata_path in enumerate(metadata_paths):
             #concatenate all dataframes
             diagnosis = pd.concat([diagnosis_train, diagnosis_dev, diagnosis_test])
             # Extracting the 'codes' column from the DataFrame as a list
-            codes = set(diagnosis['codes'])
+            codes = set(diagnosis['code'])
         else:
             for pt in metadata:
                 codes.update(set([event['codes'] for event in metadata[pt]['events']]))
