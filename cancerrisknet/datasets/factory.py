@@ -81,15 +81,23 @@ def get_dataset(args):
     dataset_class = get_dataset_class(args)
 
     datafile = pd.HDFStore(args.metadata_path)
-    if 'patients_with_valid_trajectories' in datafile.keys():
-        preprocess=False
+    if 'patients_with_valid_trajectories_train' in datafile.keys():
+        preprocess_train=False
     else:
-        preprocess=True
+        preprocess_train=True
+    if 'patients_with_valid_trajectories_dev' in datafile.keys():
+        preprocess_dev=False
+    else:
+        preprocess_dev=True
+    if 'patients_with_valid_trajectories_test' in datafile.keys():
+        preprocess_test=False
+    else:
+        preprocess_test=True
     datafile.close()
      
-    train = dataset_class(args, 'train',args.metadata_path, preprocess) if args.train else []
-    dev = dataset_class(args, 'dev',args.metadata_path, preprocess) if args.train or args. dev else []
-    test = dataset_class(args, 'test',args.metadata_path, preprocess) if args.test else []
+    train = dataset_class(args, 'train',args.metadata_path, preprocess_train) if args.train else []
+    dev = dataset_class(args, 'dev',args.metadata_path, preprocess_dev) if args.train or args. dev else []
+    test = dataset_class(args, 'test',args.metadata_path, preprocess_test) if args.test else []
 
     if args.attribute:
         attr = dataset_class(metadata, args, 'test')
