@@ -53,4 +53,4 @@ def model_step(batch, models, train_model, args):
     days_to_censor = batch['days_to_censor'].cpu().numpy()
     dates = batch['admit_date']
 
-    return loss, preds, probs, golds, patient_golds, exams, pids, censor_times, days_to_censor, dates
+    return loss, preds, probs, golds, patient_golds, pids, censor_times, days_to_censor, dates
