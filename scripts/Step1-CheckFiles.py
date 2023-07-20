@@ -122,7 +122,12 @@ for k, metadata_path in enumerate(metadata_paths):
 
         if metadata_path.endswith('.h5'):
             #load dataframe containin all diagnosis codes
-            diagnosis = pd.read_hdf(metadata_path, 'diagnosis')
+            diagnosis_train = pd.read_hdf(metadata_path, 'diagnosis_train')
+            diagnosis_dev = pd.read_hdf(metadata_path, 'diagnosis_dev')
+            diagnosis_test = pd.read_hdf(metadata_path, 'diagnosis_test')
+
+            #concatenate all dataframes
+            diagnosis = pd.concat([diagnosis_train, diagnosis_dev, diagnosis_test])
             # Extracting the 'codes' column from the DataFrame as a list
             codes = set(diagnosis['codes'])
         else:
