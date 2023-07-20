@@ -129,8 +129,7 @@ class DiseaseProgressionDataset(data.Dataset):
         """
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
-        patient_metadata= self.patients_with_valid_trajectories.iloc[patient_index]
-        patient_id= patient_metadata['patient_id']
+        patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
         patient = self.patients[self.patients.patient_id == patient_id]
 
         patient_trajectories=self.events[self.events.index == patient_id]
@@ -149,14 +148,16 @@ class DiseaseProgressionDataset(data.Dataset):
             selected_idx = [random.choice(valid_indices)]
 
         samples = []
+
+        patient_trajectories['deltas_age'] = (
+                    ((patient['year_of_birth'].iloc[0] - 2007) * 365) - patient_trajectories['admit_date']).abs()
+
         for idx in selected_idx:
-            #todo: move this copy out
             events_to_date = patient_trajectories.iloc[:idx + 1].copy()
             last_event = events_to_date.iloc[-1]
 
             # Calculate deltas using vectorized operations
             events_to_date['deltas_admitdate'] = (last_event['admit_date'] - events_to_date['admit_date']).abs()
-            events_to_date['deltas_age'] = (((patient['year_of_birth'].iloc[0]-2007)*365)-events_to_date['admit_date']).abs()
 
             codes = events_to_date['code'].tolist()
             
@@ -187,9 +188,6 @@ class DiseaseProgressionDataset(data.Dataset):
             start=MIN_TIME_EMBED_PERIOD_IN_DAYS, stop=MAX_TIME_EMBED_PERIOD_IN_DAYS, num=self.args.time_embed_dim
         ))
 
-        #deltas = np.array(events['deltas'])
-        #deltas, multipliers = deltas.reshape(len(deltas), 1), multipliers.reshape(1, len(multipliers))
-        #positional_embeddings = np.cos(deltas*multipliers)
         positional_embeddings = np.cos(events[reference_date_column].values.reshape(-1, 1) * multipliers.reshape(1, -1))
         return events[reference_date_column].max(), positional_embeddings
 
