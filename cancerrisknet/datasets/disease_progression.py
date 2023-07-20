@@ -156,9 +156,10 @@ class DiseaseProgressionDataset(data.Dataset):
 
             # Calculate deltas using vectorized operations
             events_to_date['deltas_admitdate'] = (last_event['admit_date'] - events_to_date['admit_date']).abs()
-            events_to_date['deltas_age'] = (last_event['admit_date'] - (2007 - patient['year_of_birth'] * 365)).abs()
+            events_to_date['deltas_age'] = (((patient['year_of_birth'].iloc[0]-2007)*365)-events_to_date['admit_date']).abs()
 
             codes = events_to_date['code'].tolist()
+            
             _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
             age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
