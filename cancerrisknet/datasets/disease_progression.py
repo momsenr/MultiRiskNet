@@ -133,7 +133,7 @@ class DiseaseProgressionDataset(data.Dataset):
         patient=self.patients[self.patients.patient_id == patient_index]
 
         #find the indices where the patient has a valid trajectory
-        valid_indices = patient_trajectories[patient_trajectories[is_valid_traj]==True].index.tolist()
+        valid_indices = patient_trajectories[patient_trajectories['is_valid_traj']==True].index.tolist()
 
         if self.split_group in ['dev', 'test', 'attribute']:
             if not self.args.no_random_sample_eval_trajectories:
