@@ -41,9 +41,18 @@ class DiseaseProgressionDataset(data.Dataset):
         self.patients = pd.read_hdf(self.data_hdf5_file, key='patients_'+self.split_group)
 
         if(preprocess_data==True):
+            print("Preprocessing {} data...".format(self.split_group)
             self.process_patient_data(save_path='valid_trajectories_'+self.split_group)
         else:
+            print("Loading {} data from hard disk...".format(self.split_group)
             self.events= pd.read_hdf(self.data_hdf5_file, key='valid_trajectories_'+self.split_group)
+
+        patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
+        self.patients_with_valid_trajectories = patients_with_trajectories[
+            patients_with_trajectories['is_valid_traj'] > 5]
+        total_positive = self.patients_with_valid_trajectories['y'].sum()
+        print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
+        self.class_count()
 
     def process_patient_data(self,save_path=None):
         """
@@ -102,12 +111,6 @@ class DiseaseProgressionDataset(data.Dataset):
 
         if(save_path is not None):
             self.events.to_hdf(self.data_hdf5_file, key=save_path, mode='a')
-
-        patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
-        self.patients_with_valid_trajectories= patients_with_trajectories[patients_with_trajectories['is_valid_traj'] > 5]
-        total_positive = self.patients_with_valid_trajectories['y'].sum()
-        print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
-        self.class_count()
 
     def process_events(self, events):
         """
