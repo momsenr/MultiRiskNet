@@ -132,6 +132,7 @@ class DiseaseProgressionDataset(data.Dataset):
         patient_metadata= self.patients_with_valid_trajectories.iloc[patient_index]
         patient_id= patient_metadata['patient_id']
         patient = self.patients[self.patients.patient_id == patient_id]
+
         patient_trajectories=self.events[self.events.index == patient_id]
         patient_trajectories.reset_index(inplace=True)
 
@@ -152,8 +153,11 @@ class DiseaseProgressionDataset(data.Dataset):
             #todo: move this copy out
             events_to_date = patient_trajectories.iloc[:idx + 1].copy()
             last_event = events_to_date.iloc[-1]
-            events_to_date['deltas_admitdate'] = events_to_date['admit_date'].apply(lambda x: abs(events_to_date.iloc[-1]["admit_date"] - x))
-            events_to_date['deltas_age'] = events_to_date['admit_date'].apply(lambda x: abs((2007-patient['year_of_birth']*365) - x))
+
+            # Calculate deltas using vectorized operations
+            events_to_date['deltas_admitdate'] = (last_event['admit_date'] - events_to_date['admit_date']).abs()
+            events_to_date['deltas_age'] = (last_event['admit_date'] - (2007 - patient['year_of_birth'] * 365)).abs()
+
             codes = events_to_date['code'].tolist()
             _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
             age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
