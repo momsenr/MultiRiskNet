@@ -151,10 +151,11 @@ class DiseaseProgressionDataset(data.Dataset):
         for idx in selected_idx:
             events_to_date = patient_trajectories[:idx + 1]
             last_event = events_to_date.iloc[-1]
-
+            events_to_date['deltas_admitdate'] = events_to_date['admit_date'].apply(lambda x: abs(events_to_date[-1]["admit_date"] - x))
+            events_to_date['deltas_age'] = events_to_date['admit_date'].apply(lambda x: abs((2007-patient['year_of_birth']*365) - x))
             codes = events_to_date['code'].tolist()
-            _, time_seq = self.get_time_seq(events_to_date, events_to_date.iloc[-1]['admit_date'])
-            age, age_seq = self.get_time_seq(events_to_date, (2007-patient['year_of_birth']*365))
+            _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
+            age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
                 'codes': codes,
@@ -172,11 +173,10 @@ class DiseaseProgressionDataset(data.Dataset):
             })
         return samples
 
-    def get_time_seq(self, events, reference_date):
+    def get_time_seq(self, events, reference_date_column):
         """
             Calculates the positional embeddings depending on the time diff from the events and the reference date.
         """
-        events['deltas']=events['admit_date'].apply(lambda x: abs(reference_date - x))
         multipliers = 2*np.pi / (np.linspace(
             start=MIN_TIME_EMBED_PERIOD_IN_DAYS, stop=MAX_TIME_EMBED_PERIOD_IN_DAYS, num=self.args.time_embed_dim
         ))
@@ -184,8 +184,8 @@ class DiseaseProgressionDataset(data.Dataset):
         #deltas = np.array(events['deltas'])
         #deltas, multipliers = deltas.reshape(len(deltas), 1), multipliers.reshape(1, len(multipliers))
         #positional_embeddings = np.cos(deltas*multipliers)
-        positional_embeddings = np.cos(events['deltas'].values.reshape(-1, 1) * multipliers.reshape(1, -1))
-        return events['deltas'].max(), positional_embeddings
+        positional_embeddings = np.cos(events[reference_date_column.values.reshape(-1, 1) * multipliers.reshape(1, -1))
+        return events[reference_date_column].max(), positional_embeddings
 
     def class_count(self):
         """
