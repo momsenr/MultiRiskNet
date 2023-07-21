@@ -43,10 +43,10 @@ class DiseaseProgressionDataset(data.Dataset):
 
         if(preprocess_data==True):
             print("Preprocessing {} data...".format(self.split_group))
-            self.process_patient_data(save_path=path_to_data_parquet+"_processed/")
+            self.process_patient_data(save_path=path_to_data_parquet[:-1]+"_processed/")
         else:
             print("Loading {} data from hard disk...".format(self.split_group))
-            self.events=pq.read_table(self.path_to_data_parquet+'split_group=' + self.split_group + '/')
+            self.events=pq.read_table(self.path_to_data_parquet[:1]+'_preprocessed/split_group=' + self.split_group + '/')
 
         patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
         self.patients_with_valid_trajectories = patients_with_trajectories[
