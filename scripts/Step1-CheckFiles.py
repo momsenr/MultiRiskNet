@@ -112,7 +112,7 @@ for k, metadata_path in enumerate(metadata_paths):
             # Join the parts back together with '-vocab.txt' in place of the last '/'
             new_path = parts[0] + '-vocab.txt'
             vocab_path = os.path.join(
-                    os.path.dirname(metadata_path), os.path.basename(new_path)
+                    os.path.dirname(parts[0]), os.path.basename(new_path)
             )
         else:
             print("[Step1-CheckFiles][3/3]{} Metadata {} not supported. Aborting.".format(idx, metadata_path))
