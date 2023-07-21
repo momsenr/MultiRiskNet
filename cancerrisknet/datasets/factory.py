@@ -53,7 +53,7 @@ def build_code_to_index_map(args):
         # Join the parts back together with '-vocab.txt' in place of the last '/'
         new_path = parts[0] + '-vocab.txt'
         vocab_path = os.path.join(
-            os.path.dirname(args.metadata_path), os.path.basename(new_path)
+            os.path.dirname(parts[0]), os.path.basename(new_path)
         )
     else:
         vocab_path = os.path.join(
