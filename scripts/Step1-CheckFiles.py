@@ -105,6 +105,15 @@ for k, metadata_path in enumerate(metadata_paths):
             vocab_path = os.path.join(
                 os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.h5', '-vocab.txt')
             )
+        elif metadata_path.endswith('/'):
+            # Split the string from the right side by '/'
+            parts = metadata_path.rsplit('/', 1)
+
+            # Join the parts back together with '-vocab.txt' in place of the last '/'
+            new_path = parts[0] + '-vocab.txt'
+            vocab_path = os.path.join(
+                    os.path.dirname(metadata_path), os.path.basename(new_path)
+            )
         else:
             print("[Step1-CheckFiles][3/3]{} Metadata {} not supported. Aborting.".format(idx, metadata_path))
             sys.exit(1)
