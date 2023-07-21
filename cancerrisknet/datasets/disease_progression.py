@@ -63,7 +63,7 @@ class DiseaseProgressionDataset(data.Dataset):
         """
 
         #load all events belonging to our split group into memory
-        data = pq.read_table(self.data_hdf5_file + 'split_group=' + self.split_group + '/')
+        data = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/')
         self.events = data.to_pandas()
 
         # the next line only is relevant if we base the analysis on known risk factors only
