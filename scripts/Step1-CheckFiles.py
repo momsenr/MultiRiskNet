@@ -11,6 +11,8 @@ import warnings
 import orjson
 import pickle
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 # Step 1: Check package and update if needed
 print("[Step1-CheckFiles][1/3] Checking python environment and version...")
@@ -120,16 +122,12 @@ for k, metadata_path in enumerate(metadata_paths):
         ))
         codes = set()
 
-        if metadata_path.endswith('.h5'):
-            #load dataframe containin all diagnosis codes
-            diagnosis_train = pd.read_hdf(metadata_path, 'diagnosis_train')
-            diagnosis_dev = pd.read_hdf(metadata_path, 'diagnosis_dev')
-            diagnosis_test = pd.read_hdf(metadata_path, 'diagnosis_test')
+        if metadata_path.endswith('/'):
+            # if metadata ends with '/', it is a directory containing parquet files
+            events=pq.read_table(metadata_path,columns=['code']).to_pandas()
 
-            #concatenate all dataframes
-            diagnosis = pd.concat([diagnosis_train, diagnosis_dev, diagnosis_test])
             # Extracting the 'codes' column from the DataFrame as a list
-            codes = set(diagnosis['code'])
+            codes = set(events['code'])
         else:
             for pt in metadata:
                 codes.update(set([event['codes'] for event in metadata[pt]['events']]))
