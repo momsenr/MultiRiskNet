@@ -115,11 +115,18 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events['y'] = self.events.groupby('patient_id')['is_valid_pos'].max()
 
         self.events['deltas_age'] = (((self.events['year_of_birth'] - 2007) * 365) - self.events['admit_date']).abs()
+        self.events=self.events.drop('year_of_birth',axis=1)
+        self.events=self.events.drop('is_pos_pre_cancer',axis=1)
+        self.events=self.events.drop('is_valid_pos',axis=1)
+        self.events=self.events.drop('enough_min_followup',axis=1)
+        self.events=self.events.drop('is_excluded_traj',axis=1)
+        self.events=self.events.drop('is_valid_neg',axis=1)
 
         if(save_path is not None):
             self.events["split_group"] = self.split_group
             table=pa.Table.from_pandas(self.events)
             pq.write_to_dataset(table, root_path=save_path, partition_cols=['split_group'])
+            self.events=self.events.drop("split_group",axis=1)
 
     def process_events(self, events):
         """
