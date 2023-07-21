@@ -48,12 +48,12 @@ def build_code_to_index_map(args):
 
     if(args.metadata_path.endswith('/')):
         # Split the string from the right side by '/'
-        parts = metadata_path.rsplit('/', 1)
+        parts = args.metadata_path.rsplit('/', 1)
 
         # Join the parts back together with '-vocab.txt' in place of the last '/'
         new_path = parts[0] + '-vocab.txt'
         vocab_path = os.path.join(
-            os.path.dirname(metadata_path), os.path.basename(new_path)
+            os.path.dirname(args.metadata_path), os.path.basename(new_path)
         )
     else:
         vocab_path = os.path.join(
