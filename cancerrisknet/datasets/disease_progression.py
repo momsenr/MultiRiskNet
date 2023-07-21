@@ -52,6 +52,7 @@ class DiseaseProgressionDataset(data.Dataset):
         self.patients_with_valid_trajectories = patients_with_trajectories[
             patients_with_trajectories['is_valid_traj'] > 5]
         total_positive = self.patients_with_valid_trajectories['y'].sum()
+        print("Total number of patients  in '{}' dataset is: {}.".format(self.split_group, len(self.patients_with_valid_trajectories)))
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
 
