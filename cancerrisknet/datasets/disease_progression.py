@@ -8,6 +8,8 @@ import numpy as np
 import random
 import pandas as pd
 from datetime import datetime
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
@@ -17,7 +19,7 @@ SUMMARY_MSG = "Constructed disease progression {} dataset with {} records from {
 
 @RegisterDataset("disease_progression")
 class DiseaseProgressionDataset(data.Dataset):
-    def __init__(self, args, split_group, data_hdf5_file, preprocess_data=False):
+    def __init__(self, args, split_group, path_to_data_parquet, preprocess_data=False):
         """
             Dataset for survival analysis based on categorical disease history information.
 
@@ -34,17 +36,17 @@ class DiseaseProgressionDataset(data.Dataset):
         self.args = args
         self.split_group = split_group
         self.PAD_TOKEN = PAD_TOKEN
-        self.data_hdf5_file= data_hdf5_file
+        self.path_to_data_parquet= path_to_data_parquet
         self.SETTINGS = load_data_settings(args)['SETTINGS']
 
-        self.patients = pd.read_hdf(self.data_hdf5_file, key='patients_'+self.split_group)
+        #self.patients = pd.read_hdf(self.data_hdf5_file, key='patients_'+self.split_group)
 
         if(preprocess_data==True):
             print("Preprocessing {} data...".format(self.split_group))
-            self.process_patient_data(save_path='processed_trajectories_'+self.split_group)
+            self.process_patient_data(save_path=path_to_data_parquet+"_processed/")
         else:
             print("Loading {} data from hard disk...".format(self.split_group))
-            self.events= pd.read_hdf(self.data_hdf5_file, key='processed_trajectories_'+self.split_group)
+            self.events=pq.read_table(self.path_to_data_parquet+'split_group=' + self.split_group + '/')
 
         patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
         self.patients_with_valid_trajectories = patients_with_trajectories[
@@ -61,7 +63,8 @@ class DiseaseProgressionDataset(data.Dataset):
         """
 
         #load all events belonging to our split group into memory
-        self.events = pd.read_hdf(self.data_hdf5_file, key='diagnosis_'+self.split_group)
+        data = pq.read_table(self.data_hdf5_file + 'split_group=' + self.split_group + '/')
+        self.events = data.to_pandas()
 
         # the next line only is relevant if we base the analysis on known risk factors only
         # events = self.process_events(events_raw)
@@ -110,8 +113,12 @@ class DiseaseProgressionDataset(data.Dataset):
         # y indicates whether any of the trajectories include a cancer diagnosis.
         self.events['y'] = self.events.groupby('patient_id')['is_valid_pos'].max()
 
+        self.events['deltas_age'] = (((self.events['year_of_birth'] - 2007) * 365) - self.events['admit_date']).abs()
+
         if(save_path is not None):
-            self.events.to_hdf(self.data_hdf5_file, key=save_path, mode='a')
+            self.events["split_group"] = self.split_group
+            table=pa.Table.from_pandas(self.events)
+            pq.write_to_dataset(table, root_path=save_path, partition_cols=['split_group'])
 
     def process_events(self, events):
         """
@@ -129,7 +136,6 @@ class DiseaseProgressionDataset(data.Dataset):
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
         patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
-        patient = self.patients[self.patients.patient_id == patient_id]
 
         patient_trajectories=self.events[self.events.index == patient_id].copy()
         patient_trajectories.reset_index(inplace=True)
@@ -147,9 +153,6 @@ class DiseaseProgressionDataset(data.Dataset):
             selected_idx = [random.choice(valid_indices)]
 
         samples = []
-
-        patient_trajectories['deltas_age'] = (
-                    ((patient['year_of_birth'].iloc[0] - 2007) * 365) - patient_trajectories['admit_date']).abs()
 
         for idx in selected_idx:
             events_to_date = patient_trajectories.iloc[:idx + 1].copy()

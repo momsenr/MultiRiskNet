@@ -75,31 +75,20 @@ def get_dataset(args):
         Generate torch-compatible dataset instances for training, evaluation or any other analysis.
     """
     # Depending on arg, build dataset
-    if (not args.metadata_path.endswith('.h5')):
-        raise Exception("Metadata file must be in hdf5 format")
+    #if (not args.metadata_path.endswith('.h5')):
+    #    raise Exception("Metadata file must be in hdf5 format")
 
     dataset_class = get_dataset_class(args)
 
-    if(args.load_preprocessed_from_hdf5==False):
+    if(args.data_is_preprocessed==False):
         preprocess_train=True
         preprocess_dev=True
         preprocess_test=True
     else:
-        datafile = pd.HDFStore(args.metadata_path)
-        if '/processed_trajectories_train' in datafile.keys():
-            preprocess_train=False
-        else:
-            preprocess_train=True
-        if '/processed_trajectories_dev' in datafile.keys():
-            preprocess_dev=False
-        else:
-            preprocess_dev=True
-        if '/processed_trajectories_test' in datafile.keys():
-            preprocess_test=False
-        else:
-            preprocess_test=True
-        datafile.close()
-     
+        preprocess_train=False
+        preprocess_dev=False
+        preprocess_test=False
+
     train = dataset_class(args, 'train',args.metadata_path, preprocess_train) if args.train else []
     dev = dataset_class(args, 'dev',args.metadata_path, preprocess_dev) if args.train or args. dev else []
     test = dataset_class(args, 'test',args.metadata_path, preprocess_test) if args.test else []
