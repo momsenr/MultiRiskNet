@@ -165,40 +165,15 @@ class DiseaseProgressionDataset(data.Dataset):
         samples = []
 
         for idx in selected_idx:
-            events_to_date = patient_trajectories.iloc[:idx + 1].copy()
+            events_to_date = patient_trajectories.iloc[:idx + 1]
             #, [['admit_date','code','deltas_age','future_panc_cancer_patient'
             last_event = events_to_date.iloc[-1]
 
-
-            events_to_date['deltas_admitdate'] = (last_event['admit_date'] - events_to_date['admit_date']).abs()
-            _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
-            age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
-
-            #admit_dates = events_to_date['admit_date']
-            #last_admit_date = last_event['admit_date']
             deltas_admitdate = np.abs(last_event['admit_date']-events_to_date['admit_date'])
-            deltas_age=events_to_date['deltas_age'].values
-            _, time_seq2 = self.get_time_seq2(deltas_admitdate.values)
-            age, age_seq2 = self.get_time_seq2(deltas_age)
+            _, time_seq = self.get_time_seq(deltas_admitdate.values)
+            age, age_seq = self.get_time_seq(events_to_date['deltas_age'].values)
 
             codes = events_to_date['code'].tolist()
-            
-
-            tolerance = 1e-6
-            try:
-                assert np.isclose(age_seq2, age_seq, rtol=tolerance, atol=tolerance).all()
-            except:
-                #print(events_to_date)
-                #print(events_to_date.dtypes)
-                print(time_seq-time_seq2)
-            try:
-                assert np.isclose(time_seq2, time_seq, rtol=tolerance, atol=tolerance).all()
-            except:
-                #print(events_to_date)
-                #print(events_to_date.dtypes)
-                print(time_seq-time_seq2)
-
-                exi
 
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
@@ -217,7 +192,7 @@ class DiseaseProgressionDataset(data.Dataset):
             })
         return samples
 
-    def get_time_seq2(self, deltas):
+    def get_time_seq(self, deltas):
         """
             Calculates the positional embeddings depending on the time diff from the events and the reference date.
         """
@@ -228,16 +203,6 @@ class DiseaseProgressionDataset(data.Dataset):
         positional_embeddings = np.cos(deltas.reshape(-1, 1) * multipliers.reshape(1, -1))
         return deltas.max(), positional_embeddings
 
-    def get_time_seq(self, events, reference_date_column):
-        """
-            Calculates the positional embeddings depending on the time diff from the events and the reference date.
-        """
-        multipliers = 2*np.pi / (np.linspace(
-            start=MIN_TIME_EMBED_PERIOD_IN_DAYS, stop=MAX_TIME_EMBED_PERIOD_IN_DAYS, num=self.args.time_embed_dim
-        ))
-
-        positional_embeddings = np.cos(events[reference_date_column].values.reshape(-1, 1) * multipliers.reshape(1, -1))
-        return events[reference_date_column].max(), positional_embeddings
 
     def class_count(self):
         """
