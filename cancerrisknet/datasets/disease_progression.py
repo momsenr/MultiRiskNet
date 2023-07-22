@@ -46,7 +46,8 @@ class DiseaseProgressionDataset(data.Dataset):
             self.process_patient_data(save_path=path_to_data_parquet[:-1]+"_processed/")
         else:
             print("Loading {} data from hard disk...".format(self.split_group))
-            self.events=pq.read_table(self.path_to_data_parquet[:1]+'_preprocessed/split_group=' + self.split_group + '/')
+            self.events=pq.read_table(self.path_to_data_parquet[:-1]+'_processed/split_group=' + self.split_group + '/').to_pandas()
+
 
         patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
         self.patients_with_valid_trajectories = patients_with_trajectories[
@@ -55,6 +56,7 @@ class DiseaseProgressionDataset(data.Dataset):
         print("Total number of patients  in '{}' dataset is: {}.".format(self.split_group, len(self.patients_with_valid_trajectories)))
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
+        self.events=self.events.drop('y',axis=1)
 
         self.patients_with_valid_trajectories.reset_index(inplace=True)
 
@@ -64,8 +66,7 @@ class DiseaseProgressionDataset(data.Dataset):
         """
 
         #load all events belonging to our split group into memory
-        data = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/')
-        self.events = data.to_pandas()
+        self.events = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/').to_pandas()
 
         # the next line only is relevant if we base the analysis on known risk factors only
         # events = self.process_events(events_raw)
@@ -116,6 +117,7 @@ class DiseaseProgressionDataset(data.Dataset):
 
         self.events['deltas_age'] = (((self.events['year_of_birth'] - 2007) * 365) - self.events['admit_date']).abs()
         self.events=self.events.drop('year_of_birth',axis=1)
+        self.events=self.events.drop('is_panc_cancer_code',axis=1)
         self.events=self.events.drop('is_pos_pre_cancer',axis=1)
         self.events=self.events.drop('is_valid_pos',axis=1)
         self.events=self.events.drop('enough_min_followup',axis=1)
@@ -164,14 +166,39 @@ class DiseaseProgressionDataset(data.Dataset):
 
         for idx in selected_idx:
             events_to_date = patient_trajectories.iloc[:idx + 1].copy()
+            #, [['admit_date','code','deltas_age','future_panc_cancer_patient'
             last_event = events_to_date.iloc[-1]
 
+
             events_to_date['deltas_admitdate'] = (last_event['admit_date'] - events_to_date['admit_date']).abs()
+            _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
+            age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
+
+            #admit_dates = events_to_date['admit_date']
+            #last_admit_date = last_event['admit_date']
+            deltas_admitdate = np.abs(last_event['admit_date']-events_to_date['admit_date'])
+            deltas_age=events_to_date['deltas_age'].values
+            _, time_seq2 = self.get_time_seq2(deltas_admitdate.values)
+            age, age_seq2 = self.get_time_seq2(deltas_age)
 
             codes = events_to_date['code'].tolist()
             
-            _, time_seq = self.get_time_seq(events_to_date, "deltas_admitdate")
-            age, age_seq = self.get_time_seq(events_to_date, 'deltas_age')
+
+            tolerance = 1e-6
+            try:
+                assert np.isclose(age_seq2, age_seq, rtol=tolerance, atol=tolerance).all()
+            except:
+                #print(events_to_date)
+                #print(events_to_date.dtypes)
+                print(time_seq-time_seq2)
+            try:
+                assert np.isclose(time_seq2, time_seq, rtol=tolerance, atol=tolerance).all()
+            except:
+                #print(events_to_date)
+                #print(events_to_date.dtypes)
+                print(time_seq-time_seq2)
+
+                exi
 
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
@@ -189,6 +216,17 @@ class DiseaseProgressionDataset(data.Dataset):
                 'admit_date': last_event['admit_date']#.isoformat())
             })
         return samples
+
+    def get_time_seq2(self, deltas):
+        """
+            Calculates the positional embeddings depending on the time diff from the events and the reference date.
+        """
+        multipliers = 2*np.pi / (np.linspace(
+            start=MIN_TIME_EMBED_PERIOD_IN_DAYS, stop=MAX_TIME_EMBED_PERIOD_IN_DAYS, num=self.args.time_embed_dim
+        ))
+
+        positional_embeddings = np.cos(deltas.reshape(-1, 1) * multipliers.reshape(1, -1))
+        return deltas.max(), positional_embeddings
 
     def get_time_seq(self, events, reference_date_column):
         """
