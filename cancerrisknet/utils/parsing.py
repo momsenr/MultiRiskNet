@@ -223,6 +223,66 @@ def parse_dispatcher_config(config):
     return jobs
 
 
+def parse_dispatcher_config_random(config):
+    """
+        Parses an experiment config, and creates jobs. For flags that are expected to be a single item,
+        but the config contains a list, this will return one job for each item in the list.
+
+        Args:
+            config - experiment_config json file
+        Returns:
+            jobs - a list of flag strings, each of which encapsulates one job.
+            * Example: --train --cuda --dropout=0.1 ...
+
+    """
+    jobs = [""]
+    parent_jobs =  parse_dispatcher_config(config)
+
+    try:
+        hyperparameter_space = config['search_space_random']
+        hyperparameter_space_flags = hyperparameter_space.keys()
+        hyperparameter_space_flags = sorted(hyperparameter_space_flags)
+
+        number_of_trials = config['number_of_random_trials']
+    except KeyError:
+        return parent_jobs
+
+    for _ in range(number_of_trials):
+        # randomly sample a parent job, which ideally should be one only
+        job = random.choice(parent_jobs)
+        for ind, flag in enumerate(hyperparameter_space_flags):
+            possible_values = hyperparameter_space[flag]
+
+            if len(possible_values) == 0 or type(possible_values) is not list:
+                raise Exception(POSS_VAL_NOT_LIST.format(flag, possible_values))
+
+            # If there is only one possible value, then just use that value
+            if len(possible_values) == 1:
+                value = possible_values[0]
+                job = "{} --{} {}".format(job, flag, value)
+                continue
+
+            if type(possible_values[0]) is bool:
+                # For boolean hyperparameters, randomly sample True or False
+                value = random.choice([True, False])
+                if value:
+                    job = "{} --{}".format(job, flag)
+            elif type(possible_values[0]) is list:
+                value = random.choice(possible_values)
+                val_list_str = " ".join([str(v) for v in value])
+                job = "{} --{} {}".format(job, flag, val_list_str)
+            elif type(possible_values[0]) is tuple:
+                # For tuple hyperparameters, assume that they represent the lower and upper bounds
+                # of a loguniform distribution, and sample from that distribution
+                lower_bound = possible_values[0][0]
+                upper_bound = possible_values[0][1]
+                value = np.exp(np.random.uniform(np.log(lower_bound), np.log(upper_bound)))
+                job = "{} --{} {}".format(job, flag, value)
+
+        jobs.append(job)
+
+    return jobs
+
 class Dict2Args(object):
     """
         A helper class for easier attribution retrieval for dict.
