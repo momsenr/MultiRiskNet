@@ -271,11 +271,10 @@ def parse_dispatcher_config_random(config):
                 value = random.choice(possible_values)
                 val_list_str = " ".join([str(v) for v in value])
                 job = "{} --{} {}".format(job, flag, val_list_str)
-            elif type(possible_values[0]) is tuple:
-                # For tuple hyperparameters, assume that they represent the lower and upper bounds
-                # of a loguniform distribution, and sample from that distribution
-                lower_bound = possible_values[0][0]
-                upper_bound = possible_values[0][1]
+            else:
+                # For continuous hyperparameters, randomly sample a value from a log-uniform distribution
+                lower_bound = possible_values[0]
+                upper_bound = possible_values[1]
                 value = np.exp(np.random.uniform(np.log(lower_bound), np.log(upper_bound)))
                 job = "{} --{} {}".format(job, flag, value)
 
