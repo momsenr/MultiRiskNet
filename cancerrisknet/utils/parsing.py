@@ -8,6 +8,7 @@ import cancerrisknet.learn.state_keeper as state
 import yaml
 import os
 import warnings
+import random
 
 
 POSS_VAL_NOT_LIST = 'Flag {} has an invalid list of values: {}. Length of slist must be >=1'
