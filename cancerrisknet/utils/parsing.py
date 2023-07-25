@@ -59,6 +59,8 @@ def parse_args(args_str=None):
                         help="If set to true, skip data preprocessing.")
     parser.add_argument('--min_followup_year_if_neg', type=int, default=2,
                         help="Min number of years to be required for a trajectory to count as negative. ")
+    parser.add_argument('--crop_diagnosis', type=int, default=30,
+                        help="Crop repetitive diagnosis during preprocessing after this many repeats. Defalut: 30.")
     # Hyper-params for model training
     parser.add_argument('--model_name', type=str, default='transformer', help="Model to be used.")
     parser.add_argument('--num_layers', type=int, default=1, help="Number of layers to use for sequential NNs.")

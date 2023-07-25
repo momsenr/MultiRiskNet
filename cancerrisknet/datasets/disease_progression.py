@@ -50,6 +50,7 @@ class DiseaseProgressionDataset(data.Dataset):
 
 
         patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
+
         self.patients_with_valid_trajectories = patients_with_trajectories[
             patients_with_trajectories['is_valid_traj'] > 5]
         total_positive = self.patients_with_valid_trajectories['y'].sum()
@@ -67,6 +68,9 @@ class DiseaseProgressionDataset(data.Dataset):
 
         #load all events belonging to our split group into memory
         self.events = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/').to_pandas()
+
+        if(self.args.crop_diagnosis):
+            self.events=self.events.groupby(['patient_id','code']).head(self.args.crop_diagnosis)
 
         # the next line only is relevant if we base the analysis on known risk factors only
         # events = self.process_events(events_raw)
