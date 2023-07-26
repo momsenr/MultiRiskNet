@@ -257,21 +257,21 @@ def parse_dispatcher_config_random(config):
 
             if len(possible_values) == 0 or type(possible_values) is not list:
                 raise Exception(POSS_VAL_NOT_LIST.format(flag, possible_values))
-
+            if len(possible_values) == 1:
+                value = possible_values[0]
+                job = "{} --{} {}".format(job, flag, value)
+                continue
             # If there is only one possible value, then just use that value
-            if type(possible_values[0]) is list:
-                value = random.choice(possible_values)
-                val_list_str = " ".join([str(v) for v in value])
-                job = "{} --{} {}".format(job, flag, val_list_str)
-            elif type(possible_values[0]) is bool:
+
+            if type(possible_values[0]) is bool:
                 # For boolean hyperparameters, randomly sample True or False
                 value = random.choice([True, False])
                 if value:
                     job = "{} --{}".format(job, flag)
-            elif len(possible_values) == 1:
-                value = possible_values[0]
-                job = "{} --{} {}".format(job, flag, value)
-                continue
+            elif type(possible_values) is list:
+                value = random.choice(possible_values)
+                val_list_str = " ".join([str(v) for v in value])
+                job = "{} --{} {}".format(job, flag, val_list_str)
             else:
                 # For continuous hyperparameters, randomly sample a value from a log-uniform distribution
                 lower_bound = possible_values[0]
