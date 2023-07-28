@@ -122,8 +122,9 @@ def torque_scheduler(workers):
 
 def generate_config_sublist(experiment_config_json, random_search=False):
 
+    random_jobs=False
     if(random_search):
-        job_list = parsing.parse_dispatcher_config_random(experiment_config_json)
+        random_jobs, job_list = parsing.parse_dispatcher_config_random(experiment_config_json)
     else:
         job_list = parsing.parse_dispatcher_config(experiment_config_json)
 
@@ -135,7 +136,7 @@ def generate_config_sublist(experiment_config_json, random_search=False):
         config_sublists[k % args.n_workers].append(job)
     workers = [parsing.md5(''.join(sublist)) for sublist in config_sublists]
 
-    return job_list, config_sublists, workers
+    return random_jobs, job_list, config_sublists, workers
 
 
 if __name__ == "__main__":
@@ -150,9 +151,13 @@ if __name__ == "__main__":
         sys.exit(1)
     experiment_config = json.load(open(args.experiment_config_path, 'r'))
 
-    job_list, config_sublists, worker_ids = generate_config_sublist(experiment_config_json=experiment_config, random_search=True)
+    random_jobs, job_list, config_sublists, worker_ids = generate_config_sublist(experiment_config_json=experiment_config, random_search=True)
     print("Scheduling {} dispatchers for {} jobs!".format(len(config_sublists), len(job_list)))
     [print('Sublist {} : {} jobs.'.format(worker_ids[i], len(sublist))) for i, sublist in enumerate(config_sublists)]
+
+    if(random_jobs):
+        #if random search, the md5 hashes are not deterministic, so we need to save them to a file
+
 
     datestr = datetime.now().strftime("%Y%m%d-%H%M")
     grid_md5 = parsing.md5(''.join(job_list))[:8]

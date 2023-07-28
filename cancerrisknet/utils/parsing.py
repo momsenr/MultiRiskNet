@@ -239,7 +239,7 @@ def parse_dispatcher_config_random(config):
     """
     jobs = []
     parent_jobs =  parse_dispatcher_config(config)
-
+    random_jobs = True
     try:
         hyperparameter_space = config['search_space_random']
         hyperparameter_space_flags = hyperparameter_space.keys()
@@ -247,6 +247,7 @@ def parse_dispatcher_config_random(config):
 
         number_of_trials = config['number_of_random_trials']
     except KeyError:
+        random_jobs = False
         return parent_jobs
 
     for _ in range(number_of_trials):
@@ -268,20 +269,20 @@ def parse_dispatcher_config_random(config):
                 value = random.choice([True, False])
                 if value:
                     job = "{} --{}".format(job, flag)
-            elif type(possible_values) is list:
+            elif type(possible_values[0]) is list:
                 value = random.choice(possible_values)
                 val_list_str = " ".join([str(v) for v in value])
                 job = "{} --{} {}".format(job, flag, val_list_str)
             else:
                 # For continuous hyperparameters, randomly sample a value from a log-uniform distribution
-                lower_bound = possible_values[0]
-                upper_bound = possible_values[1]
+                lower_bound = min(possible_values[0],possible_values[1])
+                upper_bound = max(possible_values[0],possible_values[1])
                 value = np.exp(np.random.uniform(np.log(lower_bound), np.log(upper_bound)))
                 job = "{} --{} {}".format(job, flag, value)
 
         jobs.append(job)
 
-    return jobs
+    return random_jobs, jobs
 
 class Dict2Args(object):
     """
