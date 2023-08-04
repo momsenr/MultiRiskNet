@@ -155,7 +155,7 @@ if __name__ == "__main__":
     print("Scheduling {} dispatchers for {} jobs!".format(len(config_sublists), len(job_list)))
     [print('Sublist {} : {} jobs.'.format(worker_ids[i], len(sublist))) for i, sublist in enumerate(config_sublists)]
 
-    if(random_jobs):
+    #if(random_jobs):
         #if random search, the md5 hashes are not deterministic, so we need to save them to a file
 
 
