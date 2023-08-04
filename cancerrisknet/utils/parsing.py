@@ -248,7 +248,7 @@ def parse_dispatcher_config_random(config):
         number_of_trials = config['number_of_random_trials']
     except KeyError:
         random_jobs = False
-        return parent_jobs
+        return random_jobs, parent_jobs
 
     for _ in range(number_of_trials):
         # randomly sample a parent job, which ideally should be one only
