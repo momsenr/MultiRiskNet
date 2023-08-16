@@ -47,10 +47,10 @@ def model_step(batch, models, train_model, args):
     preds = probs > .5
     golds = batch['y'].data.cpu().numpy()
     patient_golds = batch['future_panc_cancer'].data.cpu().numpy()
-    exams = batch['exam']
-    pids = batch['patient_id']
+    #exams = batch['exam']
+    pids = batch['patient_id'].cpu().numpy()
     censor_times = batch['time_at_event'].cpu().numpy()
     days_to_censor = batch['days_to_censor'].cpu().numpy()
-    dates = batch['admit_date']
+    dates = batch['admit_date'].cpu().numpy()
 
-    return loss, preds, probs, golds, patient_golds, exams, pids, censor_times, days_to_censor, dates
+    return loss, preds, probs, golds, patient_golds, pids, censor_times, days_to_censor, dates

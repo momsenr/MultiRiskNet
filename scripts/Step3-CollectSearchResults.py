@@ -246,12 +246,19 @@ if __name__ == "__main__":
 
     print("[Step3-CollectSearchResults][1/3]Start to collect grid exprs...")
 
+    
+    #Todo: incorporate random search - md5 sums are random!!!
     assert os.path.exists(args.experiment_config_path)
     experiment_config_json = json.load(open(args.experiment_config_path, 'r'))
     job_list = parsing.parse_dispatcher_config(experiment_config_json)
     job_ids = [parsing.md5(job) for job in job_list]
     master_id = parsing.md5(''.join(job_list))
     print(SUMMARIZING_MSG.format(len(job_list), args.search_dir + '/master.{}.summary'.format(master_id)))
+
+    #find all jobs that have been run by looking for all files that end with *.txt
+    random, _ = parsing.parse_dispatcher_config_random(experiment_config_json)
+    if(random):
+        job_ids = [f.split('.')[0] for f in os.listdir(args.result_dir) if f.endswith('.txt')]
 
     with open(args.search_dir + '/master.{}.joblist'.format(master_id), 'w') as out_file:
         out_file.write("{}\n".format(args.experiment_config_path))
@@ -279,7 +286,7 @@ if __name__ == "__main__":
             sorted_key_args = sorted(job_args.keys())
             args_dict.update({job: [job_args[k] for k in sorted_key_args]})
         print(SUCESSFUL_SEARCH_STR.format(summary_path))
-
+    
     args_df = pd.DataFrame.from_dict(args_dict, orient='index', columns=sorted_key_args)
     print("[Step3-CollectSearchResults][3/3] Start exporting... ")
     exp = master_id
@@ -302,7 +309,9 @@ if __name__ == "__main__":
     summary_csv = os.path.join(figure_path, 'master.summary_df.{}.csv'.format(exp))
     summary_df.to_csv(summary_csv)
 
-    summary_df_test_only = summary_df.loc[:, [k for k in summary_df.keys() if 'test' in k and 'roc' in k]]
+    
+    summary_df_test_only = summary_df.loc[:, [k for k in summary_df.keys() if 'test' in k and ('roc' in k or "prc" in k)]]
+    #summary_df_test_only = summary_df.loc[:, [k for k in summary_df.keys() if 'test' in k and 'roc' in k]]
     merge_df = args_df.merge(summary_df_test_only, left_index=True, right_index=True)
     merge_df_brief = args_vis.merge(summary_df_test_only, left_index=True, right_index=True)
     merge_df.to_csv(os.path.join(figure_path, 'master.merge_info.{}.csv'.format(exp)))

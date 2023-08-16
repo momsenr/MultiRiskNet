@@ -11,6 +11,8 @@ import warnings
 import orjson
 import pickle
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 # Step 1: Check package and update if needed
 print("[Step1-CheckFiles][1/3] Checking python environment and version...")
@@ -103,6 +105,15 @@ for k, metadata_path in enumerate(metadata_paths):
             vocab_path = os.path.join(
                 os.path.dirname(metadata_path), os.path.basename(metadata_path).replace('.h5', '-vocab.txt')
             )
+        elif metadata_path.endswith('/'):
+            # Split the string from the right side by '/'
+            parts = metadata_path.rsplit('/', 1)
+
+            # Join the parts back together with '-vocab.txt' in place of the last '/'
+            new_path = parts[0] + '-vocab.txt'
+            vocab_path = os.path.join(
+                    os.path.dirname(parts[0]), os.path.basename(new_path)
+            )
         else:
             print("[Step1-CheckFiles][3/3]{} Metadata {} not supported. Aborting.".format(idx, metadata_path))
             sys.exit(1)
@@ -120,11 +131,12 @@ for k, metadata_path in enumerate(metadata_paths):
         ))
         codes = set()
 
-        if metadata_path.endswith('.h5'):
-            #load dataframe containin all diagnosis codes
-            diagnosis = pd.read_hdf(metadata_path, 'diagnosis')
+        if metadata_path.endswith('/'):
+            # if metadata ends with '/', it is a directory containing parquet files
+            events=pq.read_table(metadata_path,columns=['code']).to_pandas()
+
             # Extracting the 'codes' column from the DataFrame as a list
-            codes = set(diagnosis['codes'])
+            codes = set(events['code'])
         else:
             for pt in metadata:
                 codes.update(set([event['codes'] for event in metadata[pt]['events']]))

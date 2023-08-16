@@ -1,5 +1,4 @@
 from cancerrisknet.datasets.factory import RegisterDataset, UNK_TOKEN, PAD_TOKEN
-from cancerrisknet.datasets.filter import get_avai_trajectory_indices
 from torch.utils import data
 from cancerrisknet.utils.date import parse_date
 from cancerrisknet.utils.parsing import get_code, md5, load_data_settings
@@ -7,8 +6,10 @@ import tqdm
 from collections import Counter
 import numpy as np
 import random
-import json
-
+import pandas as pd
+from datetime import datetime
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
@@ -18,7 +19,7 @@ SUMMARY_MSG = "Constructed disease progression {} dataset with {} records from {
 
 @RegisterDataset("disease_progression")
 class DiseaseProgressionDataset(data.Dataset):
-    def __init__(self, metadata, args, split_group):
+    def __init__(self, args, split_group, path_to_data_parquet, preprocess_data=False):
         """
             Dataset for survival analysis based on categorical disease history information.
 
@@ -35,152 +36,230 @@ class DiseaseProgressionDataset(data.Dataset):
         self.args = args
         self.split_group = split_group
         self.PAD_TOKEN = PAD_TOKEN
-        self.metadata = metadata
-        self.patients = []
+        self.path_to_data_parquet= path_to_data_parquet
         self.SETTINGS = load_data_settings(args)['SETTINGS']
 
-        for patient in tqdm.tqdm(metadata):
-            patient_metadata = {patient: metadata[patient]}
-            patient_dict = {'patient_id': patient}
+        #self.patients = pd.read_hdf(self.data_hdf5_file, key='patients_'+self.split_group)
 
-            if split_group != 'all' and patient_metadata[patient]['split_group'] != split_group:
-                continue
+        if(preprocess_data==True):
+            print("Preprocessing {} data...".format(self.split_group))
+            self.process_patient_data(save_path=path_to_data_parquet[:-1]+"_processed/")
+        else:
+            print("Loading {} data from hard disk...".format(self.split_group))
+            self.events=pq.read_table(self.path_to_data_parquet[:-1]+'_processed/split_group=' + self.split_group + '/').to_pandas()
 
-            obs_time_end = parse_date(patient_metadata[patient]['end_of_data'])
-            dob = parse_date(patient_metadata[patient]['birthdate'])
 
-            events = self.process_events(patient_metadata[patient]['events'])
-            future_panc_cancer, outcome_date = self.get_outcome_date(events, end_of_date=obs_time_end)
-            patient_dict.update({'future_panc_cancer': future_panc_cancer,
-                                 'dob': dob,
-                                 'outcome_date': outcome_date,
-                                 'split_group': patient_metadata[patient]['split_group'],
-                                 'obs_time_end': obs_time_end})
+        patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
 
-            avai_indices, gold = get_avai_trajectory_indices(patient_dict, events, args)
-            patient_dict.update({'avai_indices': avai_indices, 'y': gold, 'events': events})
-
-            if avai_indices:
-                self.patients.append(patient_dict)
-
-        total_positive = sum([p['y'] for p in self.patients])
+        self.patients_with_valid_trajectories = patients_with_trajectories[
+            patients_with_trajectories['is_valid_traj'] > 5]
+        total_positive = self.patients_with_valid_trajectories['y'].sum()
+        print("Total number of patients  in '{}' dataset is: {}.".format(self.split_group, len(self.patients_with_valid_trajectories)))
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
+        self.events=self.events.drop('y',axis=1)
+
+        self.patients_with_valid_trajectories.reset_index(inplace=True)
+
+    def process_patient_data(self,save_path=None):
+        """
+            Process patient data and extract valid trajectories.
+        """
+
+        #load all events belonging to our split group into memory
+        self.events = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/').to_pandas()
+
+        if(self.args.crop_diagnosis):
+            self.events=self.events.groupby(['patient_id','code']).head(self.args.crop_diagnosis)
+
+        # the next line only is relevant if we base the analysis on known risk factors only
+        # events = self.process_events(events_raw)
+
+        # Check if the code is a PANC_CANCER_CODE and mark it as True, otherwise mark it as False
+        self.events['is_panc_cancer_code'] = self.events['code'].apply(lambda x: True if (x in self.SETTINGS.PANC_CANCER_CODE) else False)
+
+        # Get a list of indices where the 'is_panc_cancer_code' is True
+        cancer_patients = list(self.events.loc[self.events.is_panc_cancer_code == True].index.unique())
+
+        # Check if the index is present in the 'cancer_patients' list and mark it as True, otherwise mark it as False
+        self.events['future_panc_cancer_patient'] = np.where(self.events.index.isin(cancer_patients), True, False)
+
+        # Calculate the 'outcome_day' based on conditions using column values
+        # If 'is_panc_cancer_code' is False, set 'outcome_day' as the value of 'observation_period_end_day'
+        # If 'is_panc_cancer_code' is True, set 'outcome_day' as the value of 'admit_date'
+        self.events['outcome_day'] = (1 - self.events['is_panc_cancer_code']) * self.events['observation_period_end_day'] \
+                                     + self.events['is_panc_cancer_code'] * self.events["admit_date"]
+
+        # Group the DataFrame by 'patient_id' and find the minimum 'outcome_day' for each patient
+        self.events['outcome_day'] = self.events.groupby('patient_id')['outcome_day'].min()
+
+        # Drop the 'observation_period_end_day' column from the DataFrame
+        self.events.drop("observation_period_end_day", axis=1, inplace=True)
+
+        """
+        The next block checks which trajectories are valid. A trajectory is valid if:
+        If the patient is a cancer patient:
+         (1) The trajectory must end before the pancreatic cancer event.
+         (2) The cancer event must occurr within the certain time after the time of assessment.
+
+        Or if the patient is not a cancer patient:
+         (3) The trajectory must end at least args.min_followup_year_if_neg before the end of the dataset
+             to exclude those cancer patients died of other reasons with the cancer undetected.
+        
+        Furthermore, the trajectorie must contain enough events (which we check later)
+        """
+        self.events['is_pos_pre_cancer'] = self.events["admit_date"] < self.events['outcome_day']
+        self.events['is_pos_in_time_horizon'] = (self.events["outcome_day"] - self.events['admit_date'] < max(self.args.month_endpoints)  * 30)
+        self.events['is_valid_pos'] = self.events.eval("future_panc_cancer_patient and is_pos_pre_cancer and is_pos_in_time_horizon")
+        self.events['enough_min_followup'] = ((self.events["outcome_day"] - self.events['admit_date']) // 365) >= self.args.min_followup_year_if_neg
+        self.events['is_valid_neg'] = self.events.eval("not future_panc_cancer_patient and enough_min_followup")
+        self.events['is_excluded_traj'] = (self.events['outcome_day'] - self.events['admit_date']) <= 30 * self.args.exclusion_interval
+        self.events['is_valid_traj'] = self.events.eval("(not is_excluded_traj) and (is_valid_neg or is_valid_pos)")
+
+        # y indicates whether any of the trajectories include a cancer diagnosis.
+        self.events['y'] = self.events.groupby('patient_id')['is_valid_pos'].max()
+
+        self.events['deltas_age'] = (((self.events['year_of_birth'] - 2007) * 365) - self.events['admit_date']).abs()
+        self.events=self.events.drop('year_of_birth',axis=1)
+        self.events=self.events.drop('is_panc_cancer_code',axis=1)
+        self.events=self.events.drop('is_pos_pre_cancer',axis=1)
+        self.events=self.events.drop('is_valid_pos',axis=1)
+        self.events=self.events.drop('enough_min_followup',axis=1)
+        self.events=self.events.drop('is_excluded_traj',axis=1)
+        self.events=self.events.drop('is_valid_neg',axis=1)
+
+        if(save_path is not None):
+            self.events["split_group"] = self.split_group
+            table=pa.Table.from_pandas(self.events)
+            pq.write_to_dataset(table, root_path=save_path, partition_cols=['split_group'])
+            self.events=self.events.drop("split_group",axis=1)
 
     def process_events(self, events):
         """
             Process the diagnosis events depending on the filters. If only known risk factors are used,
             then ICD codes that are not in the subset are replaced with PAD token.
         """
-
-        for event in events:
-            event['admit_date'] = parse_date(event['admdate'])
-
-        events = sorted(events, key=lambda x: x['admit_date'])
-
         if self.args.use_known_risk_factors_only:
             for e in events:
                 if e['codes'] not in self.SETTINGS.KNOWN_RISK_FACTORS and e['codes'] not in self.SETTINGS.PANC_CANCER_CODE:
                     e['codes'] = PAD_TOKEN
         return events
 
-    def get_trajectory(self, patient):
+    def get_trajectory(self, patient_index):
         """
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
+        patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
+
+        patient_trajectories=self.events[self.events.index == patient_id].copy()
+        patient_trajectories.reset_index(inplace=True)
+
+        #find the indices where the patient has a valid trajectory
+        valid_indices = patient_trajectories[patient_trajectories['is_valid_traj']==True].index.tolist()
 
         if self.split_group in ['dev', 'test', 'attribute']:
             if not self.args.no_random_sample_eval_trajectories:
-                selected_idx = [random.choice(patient['avai_indices']) for _ in range(self.args.max_eval_indices)]
+                selected_idx = [random.choice(valid_indices) for _ in range(self.args.max_eval_indices)]
             else:
-                selected_idx = patient['avai_indices'][-self.args.max_eval_indices:]
+                selected_idx = valid_indices[-self.args.max_eval_indices:]
 
         else:
-            selected_idx = [random.choice(patient['avai_indices'])]
+            selected_idx = [random.choice(valid_indices)]
 
         samples = []
-        for idx in selected_idx:
-            events_to_date = patient['events'][:idx + 1]
 
-            codes = [e['codes'] for e in events_to_date]
-            _, time_seq = self.get_time_seq(events_to_date, events_to_date[-1]['admit_date'])
-            age, age_seq = self.get_time_seq(events_to_date, patient['dob'])
-            y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(patient, until_idx=idx)
+        for idx in selected_idx:
+            events_to_date = patient_trajectories.iloc[:idx + 1]
+            #, [['admit_date','code','deltas_age','future_panc_cancer_patient'
+            last_event = events_to_date.iloc[-1]
+
+            deltas_admitdate = np.abs(last_event['admit_date']-events_to_date['admit_date'])
+            _, time_seq = self.get_time_seq(deltas_admitdate.values)
+            age, age_seq = self.get_time_seq(events_to_date['deltas_age'].values)
+
+            codes = events_to_date['code'].tolist()
+
+            y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
             samples.append({
                 'codes': codes,
                 'y': y,
                 'y_seq': y_seq,
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
-                'future_panc_cancer': patient['future_panc_cancer'],
-                'patient_id': patient['patient_id'],
+                'future_panc_cancer': last_event['future_panc_cancer_patient'],
+                'patient_id': patient_index,
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
                 'age_seq': age_seq,
                 'age': age,
-                'admit_date': events_to_date[-1]['admit_date'].isoformat(),
-                'exam': str(events_to_date[-1]['admid'])
+                'admit_date': last_event['admit_date']#.isoformat())
             })
         return samples
 
-    def get_time_seq(self, events, reference_date):
+    def get_time_seq(self, deltas):
         """
             Calculates the positional embeddings depending on the time diff from the events and the reference date.
         """
-        deltas = np.array([abs((reference_date - event['admit_date']).days) for event in events])
         multipliers = 2*np.pi / (np.linspace(
             start=MIN_TIME_EMBED_PERIOD_IN_DAYS, stop=MAX_TIME_EMBED_PERIOD_IN_DAYS, num=self.args.time_embed_dim
         ))
 
-        deltas, multipliers = deltas.reshape(len(deltas), 1), multipliers.reshape(1, len(multipliers))
-        positional_embeddings = np.cos(deltas*multipliers)
-        return max(deltas), positional_embeddings
+        positional_embeddings = np.cos(deltas.reshape(-1, 1) * multipliers.reshape(1, -1))
+        return deltas.max(), positional_embeddings
+
 
     def class_count(self):
         """
-            Calculates the weights used by WeightedRandomSampler for balancing the batches. 
+        Calculates the weights used by WeightedRandomSampler for balancing the batches.
         """
-        ys = [patient['y'] for patient in self.patients]
+        ys = self.patients_with_valid_trajectories['y']
         label_counts = Counter(ys)
         weight_per_label = 1. / len(label_counts)
         label_weights = {
-            label: weight_per_label/count for label, count in label_counts.items()
+            label: weight_per_label / count for label, count in label_counts.items()
         }
         self.weights = [label_weights[d] for d in ys]
 
-    def get_label(self, patient, until_idx):
+    def get_label(self, events_to_date, until_idx):
         """
+        Compute labels for a partial disease trajectory.
+
         Args:
-            patient (dict): The patient dictionary which includes all the processed diagnosis events.
+            events_to_date (DataFrame): The events DataFrame which includes all the processed diagnosis events.
             until_idx (int): Specify the end point for the partial trajectory.
 
         Returns:
-            outcome_date: date of pancreatic cancer diagnosis for cases (cancer patients) or
-                          END_OF_TIME_DATE for controls (normal patients)
-            time_at_event: the position in time vector (default: [3,6,12,36,60]) which specify the outcome_date
-            y_seq: Used as golds in cumulative_probability_layer
-                   An all zero array unless ever_develops_panc_cancer then y_seq[time_at_event:]=1
-            y_mask: how many years left in the disease window
-                    ([1] for 0:time_at_event years and [0] for the rest)
-                    (without linear interpolation, y_mask looks like complement of y_seq)
+            y (bool): True if the trajectory includes pancreatic cancer diagnosis within the time horizon,
+                      False otherwise.
+            y_seq (numpy.array): Used as golds in cumulative_probability_layer. An array of zeros with ones from
+                                 'time_at_event' to the end, indicating the occurrence of pancreatic cancer diagnosis.
+            y_mask (numpy.array): An array indicating how many years are left in the disease window. Contains ones
+                                  from the start to 'time_at_event' and zeros for the remaining duration.
+                                  (without linear interpolation, y_mask looks like the complement of y_seq)
+            time_at_event (int): The position in the time vector (default: [3, 6, 12, 36, 60]) which specifies the
+                                 outcome_date.
+            days_to_censor (int): Number of days between the outcome_date and the admit_date of the event.
 
+        Examples:
             Ex1:  A partial disease trajectory that includes pancreatic cancer diagnosis between 6-12 months
                   after time of assessment.
-                    time_at_event: 2
-                    y_seq: [0, 0, 1, 1, 1]
-                    y_mask: [1, 1, 1, 0, 0]
+                time_at_event: 2
+                y_seq: [0, 0, 1, 1, 1]
+                y_mask: [1, 1, 1, 0, 0]
+
             Ex2:  A partial disease trajectory from a patient who never gets pancreatic cancer diagnosis
                   but died between 36-60 months after time of assessment.
-                    time_at_event: 1
-                    y_seq: [0, 0, 0, 0, 0]
-                    y_mask: [1, 1, 1, 1, 0]
+                time_at_event: 1
+                y_seq: [0, 0, 0, 0, 0]
+                y_mask: [1, 1, 1, 1, 0]
         """
-        event = patient['events'][until_idx]
-        days_to_censor = (patient['outcome_date'] - event['admit_date']).days
-        num_time_steps, max_time = len(self.args.month_endpoints), max(self.args.month_endpoints)
-        y = days_to_censor < (max_time*30) and patient['future_panc_cancer']
+
+        last_event = events_to_date.iloc[until_idx]
+        days_to_censor = last_event['outcome_day'] - last_event['admit_date']
+        num_time_steps= len(self.args.month_endpoints)
+        y = last_event['is_pos_in_time_horizon'] and last_event['future_panc_cancer_patient']
         y_seq = np.zeros(num_time_steps)
-        if days_to_censor < (max_time * 30):
+        if last_event['is_pos_in_time_horizon']:
             time_at_event = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor < (mo*30)])
         else:
             time_at_event = num_time_steps - 1
@@ -192,42 +271,12 @@ class DiseaseProgressionDataset(data.Dataset):
         assert time_at_event >= 0 and len(y_seq) == len(y_mask)
         return y, y_seq.astype('float64'), y_mask.astype('float64'), time_at_event, days_to_censor
 
-    def get_outcome_date(self, events, end_of_date=None):
-        """
-        Looks through events to find date of outcome, which is defined as either pancreatic cancer
-        occurrence time or the end of trajectory. If multiple cancer events exist, use the first diagnosis date.
-
-        Args:
-            events: A list of event dicts. Each dict must have a CODE and admit_date.
-            end_of_date: The date for the death for the patient or the end date for
-                         the entire dataset (e.g. the patient is still alive).
-
-        Returns:
-            ever_develops_panc_cancer (bool): Assess if any given partial trajectory has at least
-                                              one diagnosis of pancreatic cancer.
-            time (datetime): The Date of pancreatic cancer diagnosis for cases (cancer patients) or
-                             END_OF_TIME_DATE for controls (normal patients)
-
-        """
-        if end_of_date is None:
-            end_of_date = self.SETTING.END_OF_TIME_DATE
-        panc_ca_events = [e for e in events if any(icd == e['codes'] for icd in self.SETTINGS.PANC_CANCER_CODE)]
-
-        if len(panc_ca_events) > 0:
-            ever_develops_panc_cancer = True
-            time = min([e['admit_date'] for e in panc_ca_events])
-        else:
-            ever_develops_panc_cancer = False
-            time = end_of_date
-        return ever_develops_panc_cancer, time
-
     def __len__(self):
-        return len(self.patients)
+        return len(self.patients_with_valid_trajectories)
 
-    def __getitem__(self, index):
+    def __getitem__(self, patient_index):
 
-        patient = self.patients[index]
-        samples = self.get_trajectory(patient)
+        samples = self.get_trajectory(patient_index)
         items = []
         for sample in samples:
             code_str = " ".join(sample['codes'])
@@ -240,7 +289,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'age_seq': pad_arr(age_seq, self.args.pad_size, np.zeros(self.args.time_embed_dim)),
                 'code_str': code_str
             }
-            for key in ['y', 'y_seq', 'y_mask', 'time_at_event', 'admit_date', 'exam', 'age', 'future_panc_cancer',
+            for key in ['y', 'y_seq', 'y_mask', 'time_at_event', 'admit_date', 'age', 'future_panc_cancer',
                         'days_to_censor', 'patient_id']:
                 item[key] = sample[key]
             items.append(item)

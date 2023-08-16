@@ -45,8 +45,19 @@ def build_code_to_index_map(args):
         following steps under `scripts/metadata/`.
     """
     print("Building code to index map...")
-    vocab_path = os.path.join(
-        os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.h5', '-vocab.txt')
+
+    if(args.metadata_path.endswith('/')):
+        # Split the string from the right side by '/'
+        parts = args.metadata_path.rsplit('/', 1)
+
+        # Join the parts back together with '-vocab.txt' in place of the last '/'
+        new_path = parts[0] + '-vocab.txt'
+        vocab_path = os.path.join(
+            os.path.dirname(parts[0]), os.path.basename(new_path)
+        )
+    else:
+        vocab_path = os.path.join(
+            os.path.dirname(args.metadata_path), os.path.basename(args.metadata_path).replace('.h5', '-vocab.txt')
         )
 
     with open(vocab_path, 'r') as f:
@@ -75,21 +86,23 @@ def get_dataset(args):
         Generate torch-compatible dataset instances for training, evaluation or any other analysis.
     """
     # Depending on arg, build dataset
-    if (not args.metadata_path.endswith('.h5')):
-        raise Exception("Metadata file must be in hdf5 format")
+    #if (not args.metadata_path.endswith('.h5')):
+    #    raise Exception("Metadata file must be in hdf5 format")
 
     dataset_class = get_dataset_class(args)
 
-    datafile = pd.HDFStore(args.metadata_path)
-    if 'patients_with_valid_trajectories' in datafile.keys():
-        preprocess=False
+    if(args.data_is_preprocessed==False):
+        preprocess_train=True
+        preprocess_dev=True
+        preprocess_test=True
     else:
-        preprocess=True
-    datafile.close()
-     
-    train = dataset_class(args, 'train',args.metadata_path, preprocess) if args.train else []
-    dev = dataset_class(args, 'dev',args.metadata_path, preprocess) if args.train or args. dev else []
-    test = dataset_class(args, 'test',args.metadata_path, preprocess) if args.test else []
+        preprocess_train=False
+        preprocess_dev=False
+        preprocess_test=False
+
+    train = dataset_class(args, 'train',args.metadata_path, preprocess_train) if args.train else []
+    dev = dataset_class(args, 'dev',args.metadata_path, preprocess_dev) if args.train or args. dev else []
+    test = dataset_class(args, 'test',args.metadata_path, preprocess_test) if args.test else []
 
     if args.attribute:
         attr = dataset_class(metadata, args, 'test')

@@ -8,6 +8,8 @@ import cancerrisknet.learn.state_keeper as state
 import yaml
 import os
 import warnings
+import random
+import numpy as np
 
 
 POSS_VAL_NOT_LIST = 'Flag {} has an invalid list of values: {}. Length of slist must be >=1'
@@ -55,8 +57,12 @@ def parse_args(args_str=None):
                              "If no_random_sample_eval_trajectories=True, use all the trajectories.")
     parser.add_argument('--max_eval_indices', type=int, default=250,
                         help="Max number of trajectories to include for each patient during dev and test. ")
+    parser.add_argument('--data_is_preprocessed', action='store_true', default=False,
+                        help="If set to true, skip data preprocessing.")
     parser.add_argument('--min_followup_year_if_neg', type=int, default=2,
                         help="Min number of years to be required for a trajectory to count as negative. ")
+    parser.add_argument('--crop_diagnosis', type=int, default=30,
+                        help="Crop repetitive diagnosis during preprocessing after this many repeats. Defalut: 30.")
     # Hyper-params for model training
     parser.add_argument('--model_name', type=str, default='transformer', help="Model to be used.")
     parser.add_argument('--num_layers', type=int, default=1, help="Number of layers to use for sequential NNs.")
@@ -190,7 +196,7 @@ def parse_dispatcher_config(config):
             * Example: --train --cuda --dropout=0.1 ...
 
     """
-    jobs = [""]
+    jobs = ['']
     hyperparameter_space = config['search_space']
     hyperparameter_space_flags = hyperparameter_space.keys()
     hyperparameter_space_flags = sorted(hyperparameter_space_flags)
@@ -218,6 +224,65 @@ def parse_dispatcher_config(config):
 
     return jobs
 
+
+def parse_dispatcher_config_random(config):
+    """
+        Parses an experiment config, and creates jobs. For flags that are expected to be a single item,
+        but the config contains a list, this will return one job for each item in the list.
+
+        Args:
+            config - experiment_config json file
+        Returns:
+            jobs - a list of flag strings, each of which encapsulates one job.
+            * Example: --train --cuda --dropout=0.1 ...
+
+    """
+    jobs = []
+    parent_jobs =  parse_dispatcher_config(config)
+    random_jobs = True
+    try:
+        hyperparameter_space = config['search_space_random']
+        hyperparameter_space_flags = hyperparameter_space.keys()
+        hyperparameter_space_flags = sorted(hyperparameter_space_flags)
+
+        number_of_trials = config['number_of_random_trials']
+    except KeyError:
+        random_jobs = False
+        return random_jobs, parent_jobs
+
+    for _ in range(number_of_trials):
+        # randomly sample a parent job, which ideally should be one only
+        job = random.choice(parent_jobs)
+        for ind, flag in enumerate(hyperparameter_space_flags):
+            possible_values = hyperparameter_space[flag]
+
+            if len(possible_values) == 0 or type(possible_values) is not list:
+                raise Exception(POSS_VAL_NOT_LIST.format(flag, possible_values))
+            if len(possible_values) == 1:
+                value = possible_values[0]
+                job = "{} --{} {}".format(job, flag, value)
+                continue
+            # If there is only one possible value, then just use that value
+
+            if type(possible_values[0]) is bool:
+                # For boolean hyperparameters, randomly sample True or False
+                value = random.choice([True, False])
+                if value:
+                    job = "{} --{}".format(job, flag)
+            elif type(possible_values[0]) is list:
+                value = random.choice(possible_values)
+                val_list_str = " ".join([str(v) for v in value])
+                job = "{} --{} {}".format(job, flag, val_list_str)
+            else:
+                # For continuous hyperparameters, randomly sample a value from a log-uniform distribution
+                lower_bound = min(possible_values[0],possible_values[1])
+                upper_bound = max(possible_values[0],possible_values[1])
+                value = np.exp(np.random.uniform(np.log(lower_bound), np.log(upper_bound)))
+                job = "{} --{} {}".format(job, flag, value)
+
+        jobs.append(job)
+
+    return random_jobs, jobs
 
 class Dict2Args(object):
     """
