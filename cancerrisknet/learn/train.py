@@ -10,7 +10,6 @@ from cancerrisknet.utils.time_logger import TimeLogger
 import warnings
 tqdm.monitor_interval = 0
 
-
 def train_model(train_data, dev_data, model, args):
     """
         Train model and tune on dev set using args.tuning_metric. If model doesn't improve dev performance within
@@ -93,7 +92,6 @@ def train_model(train_data, dev_data, model, args):
 
     return epoch_stats, models
 
-
 def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
     """
         Run model for one pass of data_loader, and return epoch statistics.
@@ -142,7 +140,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         max_batches = args.max_batches_per_train_epoch if train else args.max_batches_per_dev_epoch
         num_batches_per_epoch = min(len(data_loader), (max_batches))
         logger.log("Truncate epoch @ batches: {}".format(num_batches_per_epoch))
-
     i = 0
     tqdm_bar = tqdm(data_iter, total=num_batches_per_epoch)
     for batch in data_iter:
@@ -155,19 +152,18 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         batch = prepare_batch(batch, args)
         logger.newline()
         logger.log("prepare data")
-
         step_results = model_step(batch, models, train, args)
 
         loss, batch_preds, batch_probs, batch_golds, batch_patient_golds, batch_pids, batch_censors, \
             batch_days_to_censor, batch_dates = step_results
         batch_loss += loss.cpu().data.item()
         logger.log("model step")
-
         if train:
             optimizers[args.model_name].step()
             optimizers[args.model_name].zero_grad()
 
         logger.log("model update")
+        print(type(batch_loss[0]))
         losses.append(batch_loss)
         batch_loss = 0
 
@@ -195,14 +191,13 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
 
 def prepare_batch(batch, args):
-    keys_of_interest = ['x', 'y', 'y_seq', 'y_mask', 'time_seq', 'age', 'age_seq', 'time_at_event',
-                        'future_panc_cancer', 'days_to_censor']
+    keys_of_interest = ['x', 'y', 'y_seq', 'y_mask', 'time_seq', 'age', 'age_seq']#, 'time_at_event',
+                       # 'future_panc_cancer', 'days_to_censor']
 
     for key in batch.keys():
         if key in keys_of_interest:
             batch[key] = batch[key].to(args.device)
     return batch
-
 
 def eval_model(eval_data, name, models, args):
     """
@@ -220,6 +215,7 @@ def eval_model(eval_data, name, models, args):
     data_loader = get_dataset_loader(args, eval_data)
     logger_eval.log('Load eval data')
 
+
     loss, golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates = run_epoch(
         data_loader,
         train=False,
@@ -228,7 +224,10 @@ def eval_model(eval_data, name, models, args):
         optimizers=None,
         args=args
     )
-    logger_eval.log('Run eval epoch')
+
+
+    logger_eval.log('Run eval epoch')    
+
 
     log_statement, eval_stats, eval_preds = compute_eval_metrics(
                             args, loss,
