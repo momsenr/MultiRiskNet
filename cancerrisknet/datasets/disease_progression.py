@@ -10,6 +10,8 @@ import pandas as pd
 from datetime import datetime
 import pyarrow as pa
 import pyarrow.parquet as pq
+import matplotlib.pyplot as plt
+import os
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
@@ -43,25 +45,19 @@ class DiseaseProgressionDataset(data.Dataset):
 
         if(preprocess_data==True):
             print("Preprocessing {} data...".format(self.split_group))
-            self.process_patient_data(save_path=path_to_data_parquet[:-1]+"_processed/")
+            self.process_patient_data(save_path_prefix=path_to_data_parquet[:-1])
         else:
             print("Loading {} data from hard disk...".format(self.split_group))
             self.events=pq.read_table(self.path_to_data_parquet[:-1]+'_processed/split_group=' + self.split_group + '/').to_pandas()
+            self.patients_with_valid_trajectories = pq.read_table(self.path_to_data_parquet[:-1]+'_patients/split_group=' + self.split_group + '/').to_pandas()
 
-
-        patients_with_trajectories = self.events.groupby('patient_id').agg({'is_valid_traj': 'sum', 'y': 'max'})
-
-        self.patients_with_valid_trajectories = patients_with_trajectories[
-            patients_with_trajectories['is_valid_traj'] > 5]
         total_positive = self.patients_with_valid_trajectories['y'].sum()
         print("Total number of patients  in '{}' dataset is: {}.".format(self.split_group, len(self.patients_with_valid_trajectories)))
         print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
-        self.events=self.events.drop('y',axis=1)
 
-        self.patients_with_valid_trajectories.reset_index(inplace=True)
 
-    def process_patient_data(self,save_path=None):
+    def process_patient_data(self,save_path_prefix=None):
         """
             Process patient data and extract valid trajectories.
         """
@@ -127,12 +123,39 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events=self.events.drop('enough_min_followup',axis=1)
         self.events=self.events.drop('is_excluded_traj',axis=1)
         self.events=self.events.drop('is_valid_neg',axis=1)
+        
+        #the events table needs to be sorted to ensure that patients are grouped together
+        self.events.sort_values(['patient_id'],inplace=True)
 
-        if(save_path is not None):
-            self.events["split_group"] = self.split_group
+        #We need to reset the index twice to have a column named index
+        self.events.reset_index(inplace=True)
+        self.events.reset_index(inplace=True)
+
+        patients_with_trajectories = self.events.groupby('patient_id').agg(
+            is_valid_traj=('is_valid_traj', sum),
+            y=('y', max),
+            first_row=('index', min),
+            last_row=('index', max))
+        self.events.drop('index', axis=1, inplace=True)
+        self.events.set_index('patient_id', inplace=True)
+        
+        self.patients_with_valid_trajectories = patients_with_trajectories[
+            patients_with_trajectories['is_valid_traj'] > 5]
+        
+        self.events=self.events.drop('y',axis=1)
+        self.patients_with_valid_trajectories.reset_index(inplace=True)
+
+        if(save_path_prefix is not None):
+            self.events.loc["split_group"] = self.split_group
+            
             table=pa.Table.from_pandas(self.events)
-            pq.write_to_dataset(table, root_path=save_path, partition_cols=['split_group'])
+            pq.write_to_dataset(table, root_path=save_path_prefix+"_processed/", partition_cols=['split_group'])
             self.events=self.events.drop("split_group",axis=1)
+
+            self.patients_with_valid_trajectories.loc["split_group"] = self.split_group
+            table=pa.Table.from_pandas(self.patients_with_valid_trajectories)
+            pq.write_to_dataset(table, root_path=save_path_prefix+"_patients/", partition_cols=['split_group'])
+            self.patients_with_valid_trajectories=self.patients_with_valid_trajectories.drop("split_group",axis=1)
 
     def process_events(self, events):
         """
@@ -144,14 +167,16 @@ class DiseaseProgressionDataset(data.Dataset):
                 if e['codes'] not in self.SETTINGS.KNOWN_RISK_FACTORS and e['codes'] not in self.SETTINGS.PANC_CANCER_CODE:
                     e['codes'] = PAD_TOKEN
         return events
-
+    
     def get_trajectory(self, patient_index):
         """
             Given a patient, multiple trajectories can be extracted by sampling partial histories.
         """
-        patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
+        #we currently do not need the actual patient_id and instead work with the patient_index
+        #patient_id is the identifier in MarketScan, whereas patient_index is the index in the patients_with_valid_trajectories table
+        #patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
 
-        patient_trajectories=self.events[self.events.index == patient_id].copy()
+        patient_trajectories=self.events.iloc[self.patients_with_valid_trajectories.iloc[patient_index]['first_row']:self.patients_with_valid_trajectories.iloc[patient_index]['last_row']+1].copy()
         patient_trajectories.reset_index(inplace=True)
 
         #find the indices where the patient has a valid trajectory
