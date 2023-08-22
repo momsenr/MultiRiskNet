@@ -140,19 +140,18 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events.set_index('patient_id', inplace=True)
         
         self.patients_with_valid_trajectories = patients_with_trajectories[
-            patients_with_trajectories['is_valid_traj'] > 5]
+            patients_with_trajectories['is_valid_traj'] > 5].copy()
         
-        self.events=self.events.drop('y',axis=1)
+        self.events.drop('y',axis=1,inplace=True)
         self.patients_with_valid_trajectories.reset_index(inplace=True)
 
         if(save_path_prefix is not None):
-            self.events.loc["split_group"] = self.split_group
-            
+            self.events.loc[:,"split_group"] = self.split_group
             table=pa.Table.from_pandas(self.events)
             pq.write_to_dataset(table, root_path=save_path_prefix+"_processed/", partition_cols=['split_group'])
             self.events=self.events.drop("split_group",axis=1)
 
-            self.patients_with_valid_trajectories.loc["split_group"] = self.split_group
+            self.patients_with_valid_trajectories.loc[:, "split_group"] = self.split_group
             table=pa.Table.from_pandas(self.patients_with_valid_trajectories)
             pq.write_to_dataset(table, root_path=save_path_prefix+"_patients/", partition_cols=['split_group'])
             self.patients_with_valid_trajectories=self.patients_with_valid_trajectories.drop("split_group",axis=1)
