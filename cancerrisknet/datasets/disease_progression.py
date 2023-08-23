@@ -125,7 +125,7 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events=self.events.drop('is_valid_neg',axis=1)
         
         #the events table needs to be sorted to ensure that patients are grouped together
-        self.events.sort_values(['patient_id'],inplace=True)
+        self.events.sort_values(['patient_id', 'admit_date'],inplace=True)
 
         #We need to reset the index twice to have a column named index
         self.events.reset_index(inplace=True)
