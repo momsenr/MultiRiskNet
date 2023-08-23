@@ -163,7 +163,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
             optimizers[args.model_name].zero_grad()
 
         logger.log("model update")
-        print(type(batch_loss[0]))
         losses.append(batch_loss)
         batch_loss = 0
 
