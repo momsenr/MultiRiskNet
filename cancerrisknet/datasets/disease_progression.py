@@ -211,7 +211,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
                 'future_panc_cancer': last_event['future_panc_cancer_patient'],
-                'patient_id': patient_id #used to be patient_index
+                'patient_id': patient_id, #used to be patient_index
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
                 'age_seq': age_seq,
