@@ -173,7 +173,7 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         #we currently do not need the actual patient_id and instead work with the patient_index
         #patient_id is the identifier in MarketScan, whereas patient_index is the index in the patients_with_valid_trajectories table
-        #patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
+        patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
 
         patient_trajectories=self.events.iloc[self.patients_with_valid_trajectories.iloc[patient_index]['first_row']:self.patients_with_valid_trajectories.iloc[patient_index]['last_row']+1].copy()
         patient_trajectories.reset_index(inplace=True)
@@ -211,7 +211,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
                 'future_panc_cancer': last_event['future_panc_cancer_patient'],
-                'patient_id': patient_index,
+                'patient_id': patient_id #used to be patient_index
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
                 'age_seq': age_seq,
