@@ -61,7 +61,12 @@ class DiseaseProgressionDataset(data.Dataset):
         """
             Process patient data and extract valid trajectories.
         """
-
+        
+        if(save_path_prefix is not None):
+            if(os.path.exists(self.path_to_data_parquet[:-1]+'_processed/split_group=' + self.split_group + '/') or os.path.exists(self.path_to_data_parquet[:-1]+'_patients/split_group=' + self.split_group + '/')):
+                print("Data is already preprocessed. Please change config file or remove preprocessed data")
+                exit(-1)
+            
         #load all events belonging to our split group into memory
         self.events = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/').to_pandas()
 
