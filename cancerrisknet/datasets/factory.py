@@ -110,7 +110,7 @@ def get_dataset(args):
     else:
         attr = []
 
-    if args.resume_from_result is None and args.train:
+    if args.train or (args.resume_from_result is not None):
         # Build a new code to index map only during training.
         build_code_to_index_map(args)
         json.dump(args.code_to_index_map, open(args.results_path + '.code_map', 'w'))
