@@ -12,7 +12,10 @@ class CumulativeProbabilityLayer(nn.Module):
         self.args = args
         self.hazard_fc = nn.Linear(num_features,  max_followup)
         self.base_hazard_fc = nn.Linear(num_features, 1)
-        self.relu = nn.ReLU(inplace=True)
+        if(args.enforce_strict_monotonicity):
+            self.monotonicity_activation = nn.Softplus()
+        else:
+            self.monotonicity_activation = nn.ReLU(inplace=True)
         mask = torch.ones([max_followup, max_followup])
         mask = torch.tril(mask, diagonal=0)
         mask = torch.nn.Parameter(torch.t(mask), requires_grad=False)
@@ -20,7 +23,7 @@ class CumulativeProbabilityLayer(nn.Module):
 
     def hazards(self, x):
         raw_hazard = self.hazard_fc(x)
-        pos_hazard = self.relu(raw_hazard)
+        pos_hazard = self.monotonicity_activation(raw_hazard)
         return pos_hazard
 
     def forward(self, x):
