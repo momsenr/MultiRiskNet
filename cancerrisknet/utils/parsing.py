@@ -166,11 +166,11 @@ def parse_args(args_str=None):
     # Resume experiments
     if args.resume_from_result:
         resumed_args = pickle.load(open(args.resume_from_result, "rb"))
-        overwrite_args = ['--exclusion_interval', '--metadata_path', 
-                        '--dataset', '--save_dir','--num_workers', 
+        overwrite_args = ['--exclusion_interval',
+                        '--dataset', '--num_workers',
                         '--eval_batch_size', '--max_batches_per_dev_epoch', 
                         '--resume_from_result']
-        keep_args_from_config = ['train', 'dev', 'test', 'attribute']
+        keep_args_from_config = ['train', 'dev', 'test', 'attribute','metadata_path', 'save_dir', 'max_eval_indices', 'results_path', 'exp_id']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
                 keep_args_from_config.append(a.replace('--',''))
@@ -259,7 +259,7 @@ def parse_dispatcher_config_random(config):
 
             if len(possible_values) == 0 or type(possible_values) is not list:
                 raise Exception(POSS_VAL_NOT_LIST.format(flag, possible_values))
-            if len(possible_values) == 1:
+            if len(possible_values) == 1 and type(possible_values[0]) is not list
                 value = possible_values[0]
                 job = "{} --{} {}".format(job, flag, value)
                 continue
@@ -271,8 +271,8 @@ def parse_dispatcher_config_random(config):
                 if value:
                     job = "{} --{}".format(job, flag)
             elif type(possible_values[0]) is list:
-                value = random.choice(possible_values)
-                val_list_str = " ".join([str(v) for v in value])
+                value = random.choice(possible_values[0])
+                val_list_str = " ".join([str(value)])
                 job = "{} --{} {}".format(job, flag, val_list_str)
             else:
                 # For continuous hyperparameters, randomly sample a value from a log-uniform distribution
