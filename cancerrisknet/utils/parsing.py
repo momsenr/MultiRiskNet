@@ -98,7 +98,7 @@ def parse_args(args_str=None):
     parser.add_argument('--exhaust_dataloader', action='store_true', default=False,
                         help='Whether to truncate epoch to max batches per dataset epoch or to exhaust the full '
                              'dataloader. Useful when the whole data is too large. Default: False.')
-    parser.add.argument('--enforce_strict_monotonicity', action='store_true', default=False)
+    parser.add_argument('--enforce_strict_monotonicity', action='store_true', default=False)
     parser.add_argument('--init_lr', type=float, default=0.001, help='The initial learning rate [default: 0.001]')
     parser.add_argument('--lr_decay', type=float, default=1., help='Decay of learning rate [default: no decay (1.)]')
     parser.add_argument('--momentum', type=float, default=0, help='Momentum to use with SGD')
@@ -259,7 +259,7 @@ def parse_dispatcher_config_random(config):
 
             if len(possible_values) == 0 or type(possible_values) is not list:
                 raise Exception(POSS_VAL_NOT_LIST.format(flag, possible_values))
-            if len(possible_values) == 1 and type(possible_values[0]) is not list
+            if len(possible_values) == 1 and type(possible_values[0]) is not list:
                 value = possible_values[0]
                 job = "{} --{} {}".format(job, flag, value)
                 continue
