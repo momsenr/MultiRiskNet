@@ -69,6 +69,9 @@ class DiseaseProgressionDataset(data.Dataset):
             
         #load all events belonging to our split group into memory
         self.events = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/').to_pandas()
+        
+        #the events table needs to be sorted to ensure that patients are grouped together
+        self.events.sort_values(['patient_id', 'admit_date'],inplace=True)
 
         if(self.args.crop_diagnosis):
             self.events=self.events.groupby(['patient_id','code']).head(self.args.crop_diagnosis)
@@ -128,9 +131,6 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events=self.events.drop('enough_min_followup',axis=1)
         self.events=self.events.drop('is_excluded_traj',axis=1)
         self.events=self.events.drop('is_valid_neg',axis=1)
-        
-        #the events table needs to be sorted to ensure that patients are grouped together
-        self.events.sort_values(['patient_id', 'admit_date'],inplace=True)
 
         #We need to reset the index twice to have a column named index
         self.events.reset_index(inplace=True)
@@ -146,7 +146,11 @@ class DiseaseProgressionDataset(data.Dataset):
         
         self.patients_with_valid_trajectories = patients_with_trajectories[
             patients_with_trajectories['is_valid_traj'] > 5].copy()
-        
+
+        # We need to reverse the is_valid_traj column to only keep the last row with is_valid_traj==True to ensure that all
+        # diagnosis of a given date are included in the trajectory
+        self.events['is_valid_traj']= self.events.groupby(['patient_id', 'admit_date'])['is_valid_traj'].transform(lambda x: x[::-1].cumsum().eq(1)[::-1])
+
         self.events.drop('y',axis=1,inplace=True)
         self.patients_with_valid_trajectories.reset_index(inplace=True)
 
