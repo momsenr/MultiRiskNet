@@ -145,7 +145,7 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events.set_index('patient_id', inplace=True)
         
         self.patients_with_valid_trajectories = patients_with_trajectories[
-            patients_with_trajectories['is_valid_traj'] > 5].copy()
+            patients_with_trajectories['is_valid_traj'] >= self.args.min_events_length].copy()
 
         # We need to reverse the is_valid_traj column to only keep the last row with is_valid_traj==True to ensure that all
         # diagnosis of a given date are included in the trajectory
