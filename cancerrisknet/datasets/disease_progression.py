@@ -69,9 +69,6 @@ class DiseaseProgressionDataset(data.Dataset):
             
         #load all events belonging to our split group into memory
         self.events = pq.read_table(self.path_to_data_parquet + 'split_group=' + self.split_group + '/').to_pandas()
-        
-        #the events table needs to be sorted to ensure that patients are grouped together
-        self.events.sort_values(['patient_id', 'admit_date'],inplace=True)
 
         if(self.args.crop_diagnosis):
             self.events=self.events.groupby(['patient_id','code']).head(self.args.crop_diagnosis)
@@ -136,8 +133,12 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events.reset_index(inplace=True)
         self.events.reset_index(inplace=True)
 
+        # Step 1: Sort the dataframe
+        self.events = self.events.sort_values(by=['patient_id', 'admit_date', 'is_valid_traj'],
+                                              ascending=[True, True, False])
+
         patients_with_trajectories = self.events.groupby('patient_id').agg(
-            is_valid_traj=('is_valid_traj', sum),
+            number_of_valid_trajectories=('is_valid_traj', sum),
             y=('y', max),
             first_row=('index', min),
             last_row=('index', max))
@@ -145,11 +146,14 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events.set_index('patient_id', inplace=True)
         
         self.patients_with_valid_trajectories = patients_with_trajectories[
-            patients_with_trajectories['is_valid_traj'] >= self.args.min_events_length].copy()
+            patients_with_trajectories['number_of_valid_trajectories'] >= self.args.min_events_length].copy()
+        self.patients_with_valid_trajectories.drop('number_of_valid_trajectories', axis=1, inplace=True)
 
         # We need to reverse the is_valid_traj column to only keep the last row with is_valid_traj==True to ensure that all
         # diagnosis of a given date are included in the trajectory
-        self.events['is_valid_traj']= self.events.groupby(['patient_id', 'admit_date'])['is_valid_traj'].transform(lambda x: x[::-1].cumsum().eq(1)[::-1])
+        # Mark only the last occurrence of is_valid_traj == True within each group
+        self.events['is_valid_traj'] = self.events.duplicated(subset=['patient_id', 'admit_date', 'is_valid_traj'],
+                                                              keep='last') | self.events['is_valid_traj']
 
         self.events.drop('y',axis=1,inplace=True)
         self.patients_with_valid_trajectories.reset_index(inplace=True)
