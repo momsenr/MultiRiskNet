@@ -143,7 +143,6 @@ class DiseaseProgressionDataset(data.Dataset):
             first_row=('index', min),
             last_row=('index', max))
         self.events.drop('index', axis=1, inplace=True)
-        self.events.set_index('patient_id', inplace=True)
         
         self.patients_with_valid_trajectories = patients_with_trajectories[
             patients_with_trajectories['number_of_valid_trajectories'] >= self.args.min_events_length].copy()
@@ -152,8 +151,9 @@ class DiseaseProgressionDataset(data.Dataset):
         # We need to reverse the is_valid_traj column to only keep the last row with is_valid_traj==True to ensure that all
         # diagnosis of a given date are included in the trajectory
         # Mark only the last occurrence of is_valid_traj == True within each group
-        self.events['is_valid_traj'] = self.events.duplicated(subset=['patient_id', 'admit_date', 'is_valid_traj'],
-                                                              keep='last') | self.events['is_valid_traj']
+        self.events['is_valid_traj'] = self.events.duplicated(subset=['patient_id', 'admit_date']
+                                                            ) & self.events['is_valid_traj']
+        self.events.set_index('patient_id', inplace=True)
 
         self.events.drop('y',axis=1,inplace=True)
         self.patients_with_valid_trajectories.reset_index(inplace=True)
