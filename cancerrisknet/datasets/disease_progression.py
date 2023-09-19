@@ -129,13 +129,13 @@ class DiseaseProgressionDataset(data.Dataset):
         self.events=self.events.drop('is_excluded_traj',axis=1)
         self.events=self.events.drop('is_valid_neg',axis=1)
 
-        #We need to reset the index twice to have a column named index
-        self.events.reset_index(inplace=True)
-        self.events.reset_index(inplace=True)
-
         # Step 1: Sort the dataframe
         self.events = self.events.sort_values(by=['patient_id', 'admit_date', 'is_valid_traj'],
                                               ascending=[True, True, False])
+
+        #We need to reset the index twice to have a column named index
+        self.events.reset_index(inplace=True)
+        self.events.reset_index(inplace=True)
 
         patients_with_trajectories = self.events.groupby('patient_id').agg(
             number_of_valid_trajectories=('is_valid_traj', sum),
