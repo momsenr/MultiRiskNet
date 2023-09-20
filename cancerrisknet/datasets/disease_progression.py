@@ -188,15 +188,15 @@ class DiseaseProgressionDataset(data.Dataset):
         y_seq_array = np.zeros((self.num_tasks, self.num_time_steps))
         y_mask_array = np.zeros((self.num_tasks, self.num_time_steps))
 
+        if last_event['is_pos_in_time_horizon']:
+            time_at_event = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor < (mo * 30)])
+        else:
+            time_at_event = self.num_time_steps - 1
+
         for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
             y_array[task_idx] = last_event['is_pos_in_time_horizon'] and last_event[f'future_{key}_patient']
 
-            if last_event['is_pos_in_time_horizon']:
-                time_at_event = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor < (mo * 30)])
-            else:
-                time_at_event = self.num_time_steps - 1
-
-            if y:
+            if y_array[task_idx]:
                 y_seq_array[task_idx, time_at_event:] = 1
             y_mask_array[task_idx, :time_at_event + 1] = 1
 
