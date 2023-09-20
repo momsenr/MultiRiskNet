@@ -94,13 +94,16 @@ class DiseaseProgressionDataset(data.Dataset):
 
         samples = []
 
-        future_cancer_tensor = np.zeros((self.num_tasks, 1),dtype=bool)
-        for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
-            future_cancer_tensor[task_idx] = last_event[f'future_{key}_patient']
+
 
         for idx in selected_idx:
             events_to_date = patient_trajectories.iloc[:idx + 1]
             last_event = events_to_date.iloc[-1]
+
+            #TODO: if we run into speed issues, we could try to find an elegant solution to move this out of the loop
+            future_cancer_tensor = np.zeros((self.num_tasks, 1), dtype=bool)
+            for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
+                future_cancer_tensor[task_idx] = last_event[f'future_{key}_patient']
 
             deltas_admitdate = np.abs(last_event['admit_date']-events_to_date['admit_date'])
             _, time_seq = self.get_time_seq(deltas_admitdate.values)
