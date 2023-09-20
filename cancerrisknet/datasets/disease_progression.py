@@ -94,6 +94,10 @@ class DiseaseProgressionDataset(data.Dataset):
 
         samples = []
 
+        future_cancer_tensor = np.zeros(self.num_tasks, dtype=bool)
+        for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
+            future_cancer_tensor[task_idx] = last_event[f'future_{key}_patient']
+
         for idx in selected_idx:
             events_to_date = patient_trajectories.iloc[:idx + 1]
             last_event = events_to_date.iloc[-1]
@@ -105,13 +109,14 @@ class DiseaseProgressionDataset(data.Dataset):
             codes = events_to_date['code'].tolist()
 
             y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
+
             samples.append({
                 'codes': codes,
                 'y': y,
                 'y_seq': y_seq,
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
-                'future_panc_cancer': last_event['future_panc_cancer_patient'],
+                'future_panc_cancer': future_cancer_tensor,
                 'patient_id': patient_id, #used to be patient_index
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
