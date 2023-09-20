@@ -47,6 +47,8 @@ def parse_args(args_str=None):
                         help="Which level of ICD8 code is used. Default: 3, i.e. 123.")
     parser.add_argument('--max_events_length', type=int, default=300,
                         help="Max num of events to use. Apply a n-gram frame shift if exceeded.")
+    parser.add_argument('--num_tasks', type=int, default=2,
+                        help="Number of cancers to predict.")
     parser.add_argument('--min_events_length', type=int, default=5, help="Min num of events to include a patient")
     parser.add_argument('--exclusion_interval', type=int, default=0,
                         help="Exclude events before end of trajectory, default: 0 (month).")
