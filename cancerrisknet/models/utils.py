@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import pdb
-
 
 class CumulativeProbabilityLayer(nn.Module):
     """
@@ -67,3 +65,46 @@ class AttributionModel(nn.Module):
         batch['time_seq'] = time_seq
         y = self.model(x, batch=batch)
         return y
+
+class MultiTaskCumulativeProbabilityLayer(nn.Module):
+    """
+        The cumulative layer for multi-task learning which defines the
+        monotonically increasing risk scores for each task.
+    """
+
+    def __init__(self, num_features, max_followup, args):
+        super(MultiTaskCumulativeProbabilityLayer, self).__init__()
+        self.args = args
+
+        # Vectorized task-specific hazard functions and base hazard functions
+        self.hazard_fcs = nn.Linear(num_features, self.args.num_tasks * max_followup)
+        self.base_hazard_fcs = nn.Linear(num_features, self.args.num_tasks)
+
+        if (args.enforce_strict_monotonicity):
+            self.monotonicity_activation = nn.Softplus()
+        else:
+            self.monotonicity_activation = nn.ReLU(inplace=True)
+
+        # Adjusted mask for multiple tasks
+        mask = torch.ones([max_followup, max_followup])
+        mask = torch.tril(mask, diagonal=0)
+        mask = torch.nn.Parameter(mask.unsqueeze(0).expand(self.args.num_tasks, -1, -1), requires_grad=False)
+        self.register_parameter('upper_triagular_mask', mask)
+
+    def hazards(self, x):
+        raw_hazard = self.hazard_fcs(x)
+        pos_hazard = self.monotonicity_activation(raw_hazard)
+        return pos_hazard.view(-1, self.args.num_tasks,
+                               raw_hazard.shape[1] // self.args.num_tasks)  # Reshape to [B, num_tasks, max_followup]
+
+    def forward(self, x):
+        hazards_output = self.hazards(x)
+        B, _, T = hazards_output.size()
+
+        # Vectorized computation of expanded hazards
+        expanded_hazards = hazards_output.unsqueeze(-1).expand(B, self.args.num_tasks, T, T)
+        masked_hazards = expanded_hazards * self.upper_triagular_mask
+
+        cum_prob = torch.sum(masked_hazards, dim=2) + self.base_hazard_fcs(x).view(B, self.args.num_tasks, 1)
+
+        return cum_prob
