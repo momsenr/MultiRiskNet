@@ -42,7 +42,7 @@ class DiseaseProgressionDataset(data.Dataset):
         self.SETTINGS = load_data_settings(args)['SETTINGS']
         self.CANCER_CODE_dict = {"PC": '157 C25',
                             "OC": '719 C56'}
-        self.num_tasks = len(self.CANCER_CODE)
+        self.num_tasks = args.num_tasks
         self.num_time_steps= len(self.args.month_endpoints)
 
         if(preprocess_data==True):
