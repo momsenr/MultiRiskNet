@@ -6,7 +6,7 @@ import pdb
 import warnings
 import numpy as np
 from cancerrisknet.models.pools.factory import get_pool
-from cancerrisknet.models.utils import CumulativeProbabilityLayer
+from cancerrisknet.models.utils import MultiTaskCumulativeProbabilityLayer
 from cancerrisknet.models.factory import RegisterModel
 
 
@@ -30,7 +30,7 @@ class AbstractRiskModel(nn.Module):
         self.dropout = nn.Dropout(p=args.dropout)
         hidden_dim = args.hidden_dim + 1 if self.args.add_age_neuron and self.args.model_name == 'bow' \
             else args.hidden_dim
-        self.prob_of_failure_layer = CumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
+        self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
 
         if args.use_time_embed:
             if args.model_name != 'transformer':
