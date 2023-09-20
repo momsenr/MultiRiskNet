@@ -94,7 +94,7 @@ class DiseaseProgressionDataset(data.Dataset):
 
         samples = []
 
-        future_cancer_tensor = np.zeros(self.num_tasks, dtype=bool)
+        future_cancer_tensor = np.zeros((self.num_tasks, 1),dtype=bool)
         for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
             future_cancer_tensor[task_idx] = last_event[f'future_{key}_patient']
 
