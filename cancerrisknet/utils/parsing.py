@@ -140,6 +140,13 @@ def parse_args(args_str=None):
     args.device = 'cuda' if args.cuda else 'cpu'
     args.num_years = max(args.month_endpoints) / 12
 
+    with open(args.cancer_code_dict_path, 'r') as file:
+        data = file.read()
+    CANCER_CODE_dict = json.loads(data)
+
+    args.num_tasks = len(CANCER_CODE_dict)
+
+
     # Check whether the current args is legal.
     if args.train:
         assert args.dev, Exception("[E] --dev is disabled. The dev dataset is required if --train for turning purpose.")
