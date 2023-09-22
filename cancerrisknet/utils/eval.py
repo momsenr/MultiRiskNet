@@ -83,9 +83,13 @@ def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids
         task_key_prefix = f"{key_prefix}_task{task_idx}"
 
         # Extract metrics for the current task
-        task_golds = golds[:, task_idx]
-        task_patient_golds = patient_golds[:, task_idx]
-        task_probs = probs[:, task_idx]
+        task_golds = np.array([arr[task_idx] for arr in golds])
+        task_patient_golds = np.array([arr[task_idx] for arr in patient_golds]) 
+        task_probs =  np.array([arr[task_idx] for arr in probs]) 
+
+        #task_golds = golds[:, task_idx]
+        #task_patient_golds = patient_golds[:, task_idx]
+        #task_probs = probs[:, task_idx]
 
         log_statement, task_stats_dict, task_preds_dict = compute_eval_metrics(
             args, loss, task_golds, task_patient_golds, task_probs, pids, dates, censor_times,
