@@ -39,6 +39,7 @@ parser.add_argument("--machines", type=str, default='configs/avai_machines.txt',
                     help="Only for scheduler gcp: the status sheet of available machines.")
 parser.add_argument('--shuffle_experiment_order', action='store_true', default=False,
                     help='Whether to shuffle the order of experiments during grid search.')
+parser.add_argument('--gpu', default=3, help='which gpu to run sub-experiment.')
 args = parser.parse_args()
 args.save_dir = os.path.join(args.save_dir, args.search_name)
 args.search_summary_dir = os.path.join(args.search_summary_dir, args.search_name)
@@ -55,9 +56,10 @@ def RegisterScheduler(scheduler_name):
 def single_node_scheduler(workers):
     assert len(workers) == 1 and args.n_workers == 1, "n_workers does not equal to one. Cannot use single node worker."
     worker = workers[0]
-    flag_string = ' --experiment_config_path={}/{}.subexp --save_dir={} --summary_path={}/{}.summary'.format(
-        args.search_summary_dir, worker, args.save_dir, args.search_summary_dir, worker
-    )
+    flag_string = ' --experiment_config_path={}/{}.subexp --gpu {} --save_dir={} --summary_path={}/{}.summary'.format(
+        args.search_summary_dir, worker, args.gpu, args.save_dir, args.search_summary_dir, worker
+    )    
+
     shell_cmd = "python scripts/worker.py {}".format(flag_string)
     jobscript = "{}/{}.sh".format(args.search_summary_dir, worker)
     with open(jobscript, 'w') as f:
@@ -102,9 +104,10 @@ def gcp_worker(args, worker_id, machine):
 @RegisterScheduler("torque_scheduler")
 def torque_scheduler(workers):
     for worker in workers:
-        flag_string = ' --experiment_config_path={}/{}.subexp --save_dir={} --summary_path={}/{}.summary'.format(
-            args.search_summary_dir, worker, args.save_dir, args.search_summary_dir, worker
-        )
+
+        flag_string = ' --experiment_config_path={}/{}.subexp --gpu {} --save_dir={} --summary_path={}/{}.summary'.format(
+            args.search_summary_dir, worker, args.gpu, args.save_dir, args.search_summary_dir, worker
+)
 
         shell_cmd = ["#!/bin/bash", "#PBS -l nodes=1:ppn=20:gpus=1", "#PBS -l mem=400gb",
                      "#PBS -l walltime=20:00:00:00", "#PBS -N cancerrisknet", "#PBS -e {}/.$PBS_JOBID.err",
