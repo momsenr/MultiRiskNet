@@ -42,9 +42,11 @@ class DiseaseProgressionDataset(data.Dataset):
         self.path_to_data_parquet= path_to_data_parquet
         self.SETTINGS = load_data_settings(args)['SETTINGS']
 
-        #load the cancer code dict
-        self.CANCER_CODE_dict = json.loads(self.args.cancer_code_dict_path)
-        self.num_tasks = args.num_tasks
+        with open(self.args.cancer_code_dict_path, 'r') as file:
+            data = file.read()
+        self.CANCER_CODE_dict = json.loads(data)
+
+        self.num_tasks = len(self.CANCER_CODE_dict)
         self.num_time_steps= len(self.args.month_endpoints)
 
         if(preprocess_data==True):
