@@ -37,7 +37,7 @@ parser = argparse.ArgumentParser(description='Grid Search Results Collector.')
 parser.add_argument("--experiment_config_path", required=True, type=str, help="Path to the search config.")
 parser.add_argument('--result_dir', type=str, default="results", help="Where to store logs and result files.")
 parser.add_argument('--search_dir', type=str, default="searches", help="Where to store the information for the search.")
-parser.add_argument('--metric', type=str, default="dev_{}month_auprc", help='Metric to use for ordering the results.')
+parser.add_argument('--metric', type=str, default="test_task0_{}month_auprc", help='Metric to use for ordering the results.')
 parser.add_argument('--overwrite', action='store_true', default=False, help='Overwrite existing summary file.')
 parser.add_argument('--skip_loading', action='store_true', default=False)
 args = parser.parse_args()
@@ -63,41 +63,31 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
     result_keys = []
     RESULT_KEY_STEMS = ['{}_loss', '{}_c_index', '{}_c_index']
     args.num_tasks=2
+    RESULT_KEY_TASK_STEMS=[]
     for task_idx in range(args.num_tasks):
         for i1 in timepoints:
             for i2 in metrics:
-                RESULT_KEY_STEMS += ['task{}_'.format(task_idx) + '{}month_{}'.format(i1, i2)]
-    #for i1 in timepoints:
-    #    for i2 in metrics:
-    #        RESULT_KEY_STEMS += ['{}_' + '{}month_{}'.format(i1, i2)]
+                RESULT_KEY_STEMS += ['{}_'+'task{}_'.format(task_idx) + '{}month_{}'.format(i1, i2)]
     LOG_KEYS = ['result_path', 'model_path', 'log_path']
     for mode in ['epoch_train', 'epoch_dev', 'train', 'dev', 'test']:
         result_keys.extend([k.format(mode) for k in RESULT_KEY_STEMS])
-    result_keys = list(set(result_keys))
-    print(result_keys)
-
+    result_keys = list(set(result_keys))    
+    
     try:
         result_dict = {}
         try:
             dict_stats = pkl.load(open('{}.epoch_stats'.format(result_path), 'rb'))
-            print("[DEBUG] Loaded epoch statistics:", dict_stats)  # Debugging line
-
             best_epoch_indx = dict_stats['best_epoch']
             for i in dict_stats:
                 if i == 'best_epoch':
                     result_dict.update({i: dict_stats[i]})
                 else:
-                    for task_idx in range(args.num_tasks):  # Looping over tasks
-                        key_name = 'task{}_'.format(task_idx) + i if 'task{}_'.format(task_idx) in i else i
-                        print("[DEBUG] Updating result_dict with key:", 'epoch_' + key_name)  # Debugging line
-                        result_dict.update({'epoch_' + key_name: dict_stats[i]})
+                    result_dict.update({'epoch_' + i: dict_stats[i]})
         except FileNotFoundError:
             pass
         for i in ['dev', 'test']:
             if os.path.exists('{}.{}_stats'.format(result_path, i)):
                 dict_stats = pkl.load(open('{}.{}_stats'.format(result_path, i), 'rb'))
-                print("[DEBUG] Loaded {} statistics:".format(i), dict_stats)  # Debugging line
-
                 for k, v in dict_stats.items():
                     if k not in result_dict:
                         result_dict[k] = v
@@ -107,9 +97,12 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
         print("[Step3-CollectSearchResults][2/3][ERROR] Experiment failed or the result file is in another location!"
               " Logs are located at: {}".format(log_path))
         return summary, None
+    
+    #print("[DEBUG] Keys in result_dict:", result_dict.keys())  # Debugging line
+    #print("[DEBUG] Keys in result_keys:", result_keys)         # Debugging line
 
-    print("[DEBUG] Final result_dict:", result_dict)  # Debugging line
-
+    #not_found_keys = [k for k in result_keys if k not in result_dict]
+    #print("[DEBUG] Keys in result_keys not found in result_dict:", not_found_keys)  # Debugging line
 
     present_result_keys = []
     for k in result_keys:
@@ -120,6 +113,13 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
             else:
                 result_dict[k] = result_dict[k][best_epoch_indx]
                 present_result_keys.append(k)
+
+    result_dict['log_path'] = log_path
+    summary_columns = present_result_keys + LOG_KEYS
+    for prev_summary in summary:
+        if len(set(prev_summary.keys()).union(set(summary_columns))) > len(summary_columns):
+            summary_columns = list(set(prev_summary.keys()).union(set(summary_columns)))
+
 
     result_dict['log_path'] = log_path
     summary_columns = present_result_keys + LOG_KEYS
@@ -163,8 +163,6 @@ def vis_df(df, filename, vis_label='untitled', keys=[]):
 
 def rule_for_best(df, metric, timepoints):
     subset_column_metric = [metric.format(m) for m in timepoints]
-    print(subset_column_metric)
-    print(df.columns)
     df["score"] = df[subset_column_metric].mean(axis=1)
     df = df.sort_values(by='score', ascending=False)
     return df
