@@ -76,22 +76,28 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
     result_keys = list(set(result_keys))
     print(result_keys)
 
-
     try:
         result_dict = {}
         try:
             dict_stats = pkl.load(open('{}.epoch_stats'.format(result_path), 'rb'))
+            print("[DEBUG] Loaded epoch statistics:", dict_stats)  # Debugging line
+
             best_epoch_indx = dict_stats['best_epoch']
             for i in dict_stats:
                 if i == 'best_epoch':
                     result_dict.update({i: dict_stats[i]})
                 else:
-                    result_dict.update({'epoch_' + i: dict_stats[i]})
+                    for task_idx in range(args.num_tasks):  # Looping over tasks
+                        key_name = 'task{}_'.format(task_idx) + i if 'task{}_'.format(task_idx) in i else i
+                        print("[DEBUG] Updating result_dict with key:", 'epoch_' + key_name)  # Debugging line
+                        result_dict.update({'epoch_' + key_name: dict_stats[i]})
         except FileNotFoundError:
             pass
         for i in ['dev', 'test']:
             if os.path.exists('{}.{}_stats'.format(result_path, i)):
                 dict_stats = pkl.load(open('{}.{}_stats'.format(result_path, i), 'rb'))
+                print("[DEBUG] Loaded {} statistics:".format(i), dict_stats)  # Debugging line
+
                 for k, v in dict_stats.items():
                     if k not in result_dict:
                         result_dict[k] = v
@@ -101,6 +107,9 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
         print("[Step3-CollectSearchResults][2/3][ERROR] Experiment failed or the result file is in another location!"
               " Logs are located at: {}".format(log_path))
         return summary, None
+
+    print("[DEBUG] Final result_dict:", result_dict)  # Debugging line
+
 
     present_result_keys = []
     for k in result_keys:
