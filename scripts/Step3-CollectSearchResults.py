@@ -62,14 +62,20 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
 
     result_keys = []
     RESULT_KEY_STEMS = ['{}_loss', '{}_c_index', '{}_c_index']
-
-    for i1 in timepoints:
-        for i2 in metrics:
-            RESULT_KEY_STEMS += ['{}_' + '{}month_{}'.format(i1, i2)]
+    args.num_tasks=2
+    for task_idx in range(args.num_tasks):
+        for i1 in timepoints:
+            for i2 in metrics:
+                RESULT_KEY_STEMS += ['task{}_'.format(task_idx) + '{}month_{}'.format(i1, i2)]
+    #for i1 in timepoints:
+    #    for i2 in metrics:
+    #        RESULT_KEY_STEMS += ['{}_' + '{}month_{}'.format(i1, i2)]
     LOG_KEYS = ['result_path', 'model_path', 'log_path']
     for mode in ['epoch_train', 'epoch_dev', 'train', 'dev', 'test']:
         result_keys.extend([k.format(mode) for k in RESULT_KEY_STEMS])
     result_keys = list(set(result_keys))
+    print(result_keys)
+
 
     try:
         result_dict = {}
@@ -148,6 +154,8 @@ def vis_df(df, filename, vis_label='untitled', keys=[]):
 
 def rule_for_best(df, metric, timepoints):
     subset_column_metric = [metric.format(m) for m in timepoints]
+    print(subset_column_metric)
+    print(df.columns)
     df["score"] = df[subset_column_metric].mean(axis=1)
     df = df.sort_values(by='score', ascending=False)
     return df
@@ -290,7 +298,9 @@ if __name__ == "__main__":
     args_df = pd.DataFrame.from_dict(args_dict, orient='index', columns=sorted_key_args)
     print("[Step3-CollectSearchResults][3/3] Start exporting... ")
     exp = master_id
+    print(summary_path)
     summary_df = pd.read_csv(summary_path)
+    print(summary_df.columns)
     summary_df.index = [os.path.basename(log_path).split('.')[0] for log_path in summary_df.log_path]
     configs = pd.read_csv(args.search_dir + '/master.' + exp + '.joblist')
 
@@ -316,7 +326,7 @@ if __name__ == "__main__":
     merge_df_brief = args_vis.merge(summary_df_test_only, left_index=True, right_index=True)
     merge_df.to_csv(os.path.join(figure_path, 'master.merge_info.{}.csv'.format(exp)))
     merge_df_brief.to_csv(os.path.join(figure_path, 'master.merge_info_brief.{}.csv'.format(exp)))
-
+    
     print_grid_performances(summary_df, args_df)
 
     partitions = ['epoch_train', 'epoch_dev', 'train', 'dev', 'test']
