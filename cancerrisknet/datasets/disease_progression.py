@@ -12,6 +12,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import matplotlib.pyplot as plt
 import os
+import json
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
@@ -40,8 +41,9 @@ class DiseaseProgressionDataset(data.Dataset):
         self.PAD_TOKEN = PAD_TOKEN
         self.path_to_data_parquet= path_to_data_parquet
         self.SETTINGS = load_data_settings(args)['SETTINGS']
-        self.CANCER_CODE_dict = {"PC": '157 C25',
-                            "OC": '719 C56'}
+
+        #load the cancer code dict
+        self.CANCER_CODE_dict = json.loads(self.args.cancer_code_dict_path)
         self.num_tasks = args.num_tasks
         self.num_time_steps= len(self.args.month_endpoints)
 
