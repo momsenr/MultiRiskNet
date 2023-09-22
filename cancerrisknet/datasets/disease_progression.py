@@ -50,8 +50,12 @@ class DiseaseProgressionDataset(data.Dataset):
             sys.exit(-1)
         else:
             print("Loading {} data from hard disk...".format(self.split_group))
-            self.events=pq.read_table(self.path_to_data_parquet[:-1]+'_processed/split_group=' + self.split_group + '/').to_pandas()
-            self.patients_with_valid_trajectories = pq.read_table(self.path_to_data_parquet[:-1]+'_patients/split_group=' + self.split_group + '/').to_pandas()
+            self.events=pq.read_table(self.path_to_data_parquet+self.split_group+'_processed/').to_pandas()
+
+            #while in an earlier sorting was not necessary, we now have to restore the row order
+            #possibly due to pyarrow update
+            self.events.sort_values(by=['patient_id', 'admit_date', 'is_valid_traj'],inplace=True)
+            self.patients_with_valid_trajectories = pq.read_table(self.path_to_data_parquet + self.split_group + '_patients/').to_pandas()
 
         total_positive = self.patients_with_valid_trajectories['y'].sum()
         print("Total number of patients  in '{}' dataset is: {}.".format(self.split_group, len(self.patients_with_valid_trajectories)))
@@ -75,10 +79,12 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         #we currently do not need the actual patient_id and instead work with the patient_index
         #patient_id is the identifier in MarketScan, whereas patient_index is the index in the patients_with_valid_trajectories table
+
         patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
 
         patient_trajectories=self.events.iloc[self.patients_with_valid_trajectories.iloc[patient_index]['first_row']:self.patients_with_valid_trajectories.iloc[patient_index]['last_row']+1].copy()
         patient_trajectories.reset_index(inplace=True)
+        
 
         #find the indices where the patient has a valid trajectory
         valid_indices = patient_trajectories[patient_trajectories['is_valid_traj']==True].index.tolist()
@@ -90,7 +96,13 @@ class DiseaseProgressionDataset(data.Dataset):
                 selected_idx = valid_indices[-self.args.max_eval_indices:]
 
         else:
-            selected_idx = [random.choice(valid_indices)]
+            try:
+                selected_idx = [random.choice(valid_indices)]
+            except:
+                print(patient_id)
+                print(self.patients_with_valid_trajectories.iloc[patient_index])
+                print(patient_trajectories)
+                exit
 
         samples = []
 
