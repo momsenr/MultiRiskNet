@@ -18,10 +18,9 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
 
     y_seq = batch['y_seq']
     y_mask = batch['y_mask']
-
     # If no specific task weights are provided, assume equal weights for all tasks.
     if task_weights is None:
-        task_weights = torch.ones(logits.shape[0]).to(logits.device)
+        task_weights = torch.ones(logits.shape[1]).to(logits.device)
     else:
         task_weights = torch.tensor(task_weights).to(logits.device)
 
@@ -32,10 +31,9 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
         losses = torch.sum(losses, dim=-1) / torch.sum(y_mask, dim=-1)
     elif args.loss_fn == 'mse':
         # Compute MSE loss for all tasks, adjust to sum the losses and then average over tasks
-        losses = F.mse_loss(logits, y_seq, reduction='sum').div(logits.shape[0])
+        losses = F.mse_loss(logits, y_seq, reduction='sum').div(logits.shape[1])
     else:
         raise Exception('Loss function is illegal or not found.')
-
     # Weighted sum of all task losses
     total_loss = torch.sum(task_weights * losses)
 
