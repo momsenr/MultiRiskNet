@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from cancerrisknet.learn.step import model_step
-from cancerrisknet.utils.eval import compute_eval_metrics
+from cancerrisknet.utils.eval import compute_eval_metrics_multitask
 from cancerrisknet.utils.learn import init_metrics_dictionary, \
     get_dataset_loader, get_train_variables
 from cancerrisknet.utils.time_logger import TimeLogger
@@ -43,7 +43,7 @@ def train_model(train_data, dev_data, model, args):
                           optimizers=optimizers, args=args)
             logger_epoch.log("Run epoch ({})".format(key_prefix))
 
-            log_statement, epoch_stats, _ = compute_eval_metrics(args, loss, golds, patient_golds, probs,
+            log_statement, epoch_stats, _ = compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs,
                                                                  pids, dates, censor_times, days_to_final_censors,
                                                                  epoch_stats, key_prefix)
             logger_epoch.log("Compute eval metrics ({})".format(key_prefix))
@@ -228,7 +228,7 @@ def eval_model(eval_data, name, models, args):
     logger_eval.log('Run eval epoch')    
 
 
-    log_statement, eval_stats, eval_preds = compute_eval_metrics(
+    log_statement, eval_stats, eval_preds = compute_eval_metrics_multitask(
                             args, loss,
                             golds, patient_golds, probs, pids, dates,
                             censor_times, days_to_final_censors, eval_stats, name)

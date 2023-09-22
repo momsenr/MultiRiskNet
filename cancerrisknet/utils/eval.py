@@ -72,6 +72,41 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
 
     return log_statement, stats_dict, preds_dict
 
+
+def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids, dates, censor_times,
+                                   days_to_final_censors, stats_dict, key_prefix):
+    all_log_statements = []
+    all_stats_dicts = []
+    all_preds_dicts = []
+
+    for task_idx in range(args.num_tasks):
+        task_key_prefix = f"{key_prefix}_task{task_idx}"
+
+        # Extract metrics for the current task
+        task_golds = golds[:, task_idx]
+        task_patient_golds = patient_golds[:, task_idx]
+        task_probs = probs[:, task_idx]
+
+        log_statement, task_stats_dict, task_preds_dict = compute_eval_metrics(
+            args, loss, task_golds, task_patient_golds, task_probs, pids, dates, censor_times,
+            days_to_final_censors, stats_dict, task_key_prefix
+        )
+
+        all_log_statements.append(log_statement)
+        all_stats_dicts.append(task_stats_dict)
+        all_preds_dicts.append(task_preds_dict)
+
+    # Combine all task log statements into one
+    combined_log_statement = "\n".join(all_log_statements)
+
+    # Combine all stats_dicts and preds_dicts (This is just one way to combine, adjust as needed)
+    for d in all_stats_dicts:
+        stats_dict.update(d)
+    combined_preds_dict = {key: [d[key] for d in all_preds_dicts] for key in all_preds_dicts[0]}
+
+    return combined_log_statement, stats_dict, combined_preds_dict
+
+
 def include_exam_and_determine_label(followup, censor_time, gold, cumulative_prediction_interval=True):
     """
         Determine if a given prediction should be evaluated in this pass.
