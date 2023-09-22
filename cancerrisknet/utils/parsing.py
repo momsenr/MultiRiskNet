@@ -10,9 +10,7 @@ import os
 import warnings
 import random
 import numpy as np
-
-
-POSS_VAL_NOT_LIST = 'Flag {} has an invalid list of values: {}. Length of slist must be >=1'
+import json
 
 
 def parse_args(args_str=None):
