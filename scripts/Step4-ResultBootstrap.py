@@ -191,9 +191,7 @@ if __name__ == "__main__":
                 'censor_times': task_censor_times,
             }
             for index, month in enumerate(results['month_endpoints']):
-                print(index, month)
                 probs_for_eval, golds_for_eval = get_probs_golds(task_preds_dict, index=index)
-                print(len(probs_for_eval))
                 probs_for_eval = np.array(probs_for_eval)[::args.n_samples]
                 golds_for_eval = np.array(golds_for_eval)[::args.n_samples]
                 if not np.sum(golds_for_eval) > 0:
