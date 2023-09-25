@@ -179,19 +179,16 @@ if __name__ == "__main__":
         results = pickle.load(open(results_path, 'rb'))
         test_preds = pickle.load(open(test_preds_path, 'rb'))
         print(printing_prefix, "[INFO] Data loaded from {}... ".format(test_preds_path))
-        args.num_tasks=2
-        print(test_preds['golds'][0])
-        for task_idx in range(args.num_tasks):
+        
+        num_tasks=len(test_preds['golds'])
+
+        for task_idx in range(num_tasks):
             task_golds = test_preds['golds'][task_idx]
-            task_patient_golds = test_preds['patient_golds'][task_idx]
             task_probs =  test_preds['probs'][task_idx]
-            #todo: is the next line needed/
             task_censor_times =  test_preds['censor_times'][task_idx]
             task_preds_dict = {'golds': task_golds,
                 'probs': task_probs,
-                'patient_golds': task_patient_golds,
                 'censor_times': task_censor_times,
-                'days_to_final_censors': test_preds['days_to_final_censors']
             }
             for index, month in enumerate(results['month_endpoints']):
                 print(index, month)
