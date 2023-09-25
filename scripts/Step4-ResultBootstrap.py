@@ -179,90 +179,99 @@ if __name__ == "__main__":
         results = pickle.load(open(results_path, 'rb'))
         test_preds = pickle.load(open(test_preds_path, 'rb'))
         print(printing_prefix, "[INFO] Data loaded from {}... ".format(test_preds_path))
-        for index, month in enumerate(results['month_endpoints']):
-            probs_for_eval, golds_for_eval = get_probs_golds(test_preds, index=index)
-            probs_for_eval = np.array(probs_for_eval)[::args.n_samples]
-            golds_for_eval = np.array(golds_for_eval)[::args.n_samples]
+        args.num_tasks=2
+        print(test_preds['golds'][0])
+        for task_idx in range(args.num_tasks):
+            task_golds = test_preds['golds'][task_idx]
+            task_patient_golds = test_preds['patient_golds'][task_idx]
+            task_probs =  test_preds['probs'][task_idx]
+            #todo: is the next line needed/
+            task_censor_times =  test_preds['censor_times'][task_idx]
+            task_preds_dict = {'golds': task_golds,
+                'probs': task_probs,
+                'patient_golds': task_patient_golds,
+                'censor_times': task_censor_times,
+                'days_to_final_censors': test_preds['days_to_final_censors']
+            }
+            for index, month in enumerate(results['month_endpoints']):
+                print(index, month)
+                probs_for_eval, golds_for_eval = get_probs_golds(task_preds_dict, index=index)
+                print(len(probs_for_eval))
+                probs_for_eval = np.array(probs_for_eval)[::args.n_samples]
+                golds_for_eval = np.array(golds_for_eval)[::args.n_samples]
+                if not np.sum(golds_for_eval) > 0:
+                    continue
 
-            if not np.sum(golds_for_eval) > 0:
-                continue
+                try:
+                    save_path_AUROC = os.path.join(save_dir, "task{}_{}.results.test_preds.{}.auroc.png".format(task_idx,exp_id, month))
+                    save_path_AUPRC = os.path.join(save_dir, "task{}_{}.results.test_preds.{}.auprc.png".format(task_idx,exp_id, month))
+                    save_path_RRcurve = os.path.join(save_dir, "task{}_{}.results.test_preds.{}.RR.png".format(task_idx,exp_id, month))
+                    fpr, tpr, _ = sklearn.metrics.roc_curve(golds_for_eval, probs_for_eval, pos_label=1)
+                    precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(golds_for_eval, probs_for_eval,
+                                                                                    pos_label=1)
 
-            try:
-                save_path_AUROC = os.path.join(save_dir, "{}.results.test_preds.{}.auroc.png".format(exp_id, month))
-                save_path_AUPRC = os.path.join(save_dir, "{}.results.test_preds.{}.auprc.png".format(exp_id, month))
-                save_path_RRcurve = os.path.join(save_dir, "{}.results.test_preds.{}.RR.png".format(exp_id, month))
-                fpr, tpr, _ = sklearn.metrics.roc_curve(golds_for_eval, probs_for_eval, pos_label=1)
-                precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(golds_for_eval, probs_for_eval,
-                                                                                pos_label=1)
+                    auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
+                    auc_prc = sklearn.metrics.auc(recalls, precisions)
 
-                auc_roc = sklearn.metrics.roc_auc_score(golds_for_eval, probs_for_eval, average='samples')
-                auc_prc = sklearn.metrics.auc(recalls, precisions)
+                    # compute RR curve
+                    incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
+                    fps, tps, _ = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
+                    positives=fps+tps
+                    precisions_from_binary_clf=tps/positives
+                    at_risk=positives*1000000/len(golds_for_eval)
+                    RR=np.divide(precisions_from_binary_clf,incidence_ratio)
 
-                # compute RR curve
-                incidence_ratio=np.sum(golds_for_eval)/len(golds_for_eval)
-                fps, tps, _ = _binary_clf_curve(golds_for_eval, probs_for_eval, pos_label=1)
-                positives=fps+tps
-                precisions_from_binary_clf=tps/positives
-                at_risk=positives*1000000/len(golds_for_eval)
-                RR=np.divide(precisions_from_binary_clf,incidence_ratio)
+                    # Plot ROC curve
+                    plt.figure()
+                    plt.plot(fpr, tpr, color='blue', lw=2, label='ROC curve (AUC = {:.2f})'.format(auc_roc))
+                    plt.plot([0, 1], [0, 1], color='red', lw=2, linestyle='--')
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
+                    plt.xlabel('False Positive Rate')
+                    plt.ylabel('True Positive Rate')
+                    plt.title('Receiver Operating Characteristic')
+                    plt.legend(loc='lower right')
+                    # Save the ROC curve plot if save_path is provided
+                    plt.savefig(save_path_AUROC)
+                    plt.close()
 
-                # Plot ROC curve
-                plt.figure()
-                plt.plot(fpr, tpr, color='blue', lw=2, label='ROC curve (AUC = {:.2f})'.format(auc_roc))
-                plt.plot([0, 1], [0, 1], color='red', lw=2, linestyle='--')
-                plt.xlim([0.0, 1.0])
-                plt.ylim([0.0, 1.05])
-                plt.xlabel('False Positive Rate')
-                plt.ylabel('True Positive Rate')
-                plt.title('Receiver Operating Characteristic')
-                plt.legend(loc='lower right')
-                # Save the ROC curve plot if save_path is provided
-                plt.savefig(save_path_AUROC)
-                plt.close()
+                    # Plot Precision-Recall curve
+                    plt.figure()
+                    plt.plot(recalls, precisions, color='blue', lw=2,
+                            label='Precision-Recall curve (AUC = {:.2f})'.format(auc_prc))
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
+                    plt.xlabel('Recall')
+                    plt.ylabel('Precision')
+                    plt.title('Precision-Recall Curve')
+                    plt.legend(loc='lower right')
 
-                # Plot Precision-Recall curve
-                plt.figure()
-                plt.plot(recalls, precisions, color='blue', lw=2,
-                         label='Precision-Recall curve (AUC = {:.2f})'.format(auc_prc))
-                plt.xlim([0.0, 1.0])
-                plt.ylim([0.0, 1.05])
-                plt.xlabel('Recall')
-                plt.ylabel('Precision')
-                plt.title('Precision-Recall Curve')
-                plt.legend(loc='lower right')
+                    # Save the Precision-Recall curve plot if save_path is provided
+                    plt.savefig(save_path_AUPRC)
+                    plt.close()
 
-                # Save the Precision-Recall curve plot if save_path is provided
-                plt.savefig(save_path_AUPRC)
-                plt.close()
+                    # plot relative risk  curve
+                    plt.figure()
+                    plt.plot(at_risk, RR, color='blue', lw=2,
+                                label='RR curve')
+                    plt.xlim([300, 200000])
+                    plt.ylim([0.0, 250])
+                    plt.xlabel('n at risk per 1M')
+                    plt.ylabel('RR')
+                    plt.title('RR Curve')
+                    plt.legend(loc='lower right')
+                    plt.xscale('log')  # Set x-axis to logarithmic scale
+                    plt.savefig(save_path_RRcurve)
+                    plt.close()
 
-                # plot relative risk  curve
-                plt.figure()
-                plt.plot(at_risk, RR, color='blue', lw=2,
-                            label='RR curve')
-                plt.xlim([300, 200000])
-                plt.ylim([0.0, 250])
-                plt.xlabel('n at risk per 1M')
-                plt.ylabel('RR')
-                plt.title('RR Curve')
-                plt.legend(loc='lower right')
-                plt.xscale('log')  # Set x-axis to logarithmic scale
-                plt.savefig(save_path_RRcurve)
-                plt.close()
+                except Exception as e:
+                    warnings.warn("Failed to calculate AUROC/AUPRC because {}".format(e))
 
-
-
-
-                #false_positive_examples = np.where(y_scores >= desired_threshold)[0]
-
-
-            except Exception as e:
-                warnings.warn("Failed to calculate AUROC/AUPRC because {}".format(e))
-
-            print(printing_prefix, "Processing time interval: {} [{}/{}].".format(
-                month, index + 1, len(results['month_endpoints'])))
-            experiment_performance = get_performance_ci(probs_for_eval, golds_for_eval, model_name, month,
+                print(printing_prefix, "Processing time interval: {} [{}/{}].".format(
+                    month, index + 1, len(results['month_endpoints'])))
+                experiment_performance = get_performance_ci(probs_for_eval, golds_for_eval, model_name, month,
                                                         exclusion_interval, exp_id, n_boot=args.bootstrap_size)
-            metrics_records.extend(experiment_performance)
+                metrics_records.extend(experiment_performance)
 
     os.makedirs(os.path.join(os.path.dirname(args.search_metadata), 'figures'), exist_ok=True)
     os.chdir(os.path.join(os.path.dirname(args.search_metadata), 'figures'))
