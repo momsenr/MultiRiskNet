@@ -56,6 +56,10 @@ class DiseaseProgressionDataset(data.Dataset):
             #while in an earlier sorting was not necessary, we now have to restore the row order
             #possibly due to pyarrow update
             self.events.sort_values(by=['patient_id', 'admit_date', 'is_valid_traj'],inplace=True)
+
+            #we do not need the patient_id anymore
+            self.events.drop(columns=['patient_id'], inplace=True)
+
             self.patients_with_valid_trajectories = pq.read_table(self.path_to_data_parquet + self.split_group + '_patients/').to_pandas()
 
         total_positive = self.patients_with_valid_trajectories['y'].sum()
