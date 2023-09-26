@@ -16,9 +16,6 @@ import json
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
-SUMMARY_MSG = "Constructed disease progression {} dataset with {} records from {} patients, " \
-              "and the following class balance:\n  {}"
-
 
 @RegisterDataset("disease_progression")
 class DiseaseProgressionDataset(data.Dataset):
@@ -45,8 +42,8 @@ class DiseaseProgressionDataset(data.Dataset):
         with open(self.args.cancer_code_dict_path, 'r') as file:
             data = file.read()
         self.CANCER_CODE_dict = json.loads(data)
-
         self.num_tasks = len(self.CANCER_CODE_dict)
+
         self.num_time_steps= len(self.args.month_endpoints)
 
         if(preprocess_data==True):
