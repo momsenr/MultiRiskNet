@@ -98,11 +98,6 @@ def update_summary_with_results(result_path, log_path, summary, summary_path):
               " Logs are located at: {}".format(log_path))
         return summary, None
     
-    #print("[DEBUG] Keys in result_dict:", result_dict.keys())  # Debugging line
-    #print("[DEBUG] Keys in result_keys:", result_keys)         # Debugging line
-
-    #not_found_keys = [k for k in result_keys if k not in result_dict]
-    #print("[DEBUG] Keys in result_keys not found in result_dict:", not_found_keys)  # Debugging line
 
     present_result_keys = []
     for k in result_keys:
@@ -305,9 +300,7 @@ if __name__ == "__main__":
     args_df = pd.DataFrame.from_dict(args_dict, orient='index', columns=sorted_key_args)
     print("[Step3-CollectSearchResults][3/3] Start exporting... ")
     exp = master_id
-    print(summary_path)
     summary_df = pd.read_csv(summary_path)
-    print(summary_df.columns)
     summary_df.index = [os.path.basename(log_path).split('.')[0] for log_path in summary_df.log_path]
     configs = pd.read_csv(args.search_dir + '/master.' + exp + '.joblist')
 

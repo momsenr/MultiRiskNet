@@ -16,9 +16,6 @@ import json
 
 MAX_TIME_EMBED_PERIOD_IN_DAYS = 120 * 365
 MIN_TIME_EMBED_PERIOD_IN_DAYS = 10
-SUMMARY_MSG = "Constructed disease progression {} dataset with {} records from {} patients, " \
-              "and the following class balance:\n  {}"
-
 
 @RegisterDataset("disease_progression")
 class DiseaseProgressionDataset(data.Dataset):
@@ -45,8 +42,8 @@ class DiseaseProgressionDataset(data.Dataset):
         with open(self.args.cancer_code_dict_path, 'r') as file:
             data = file.read()
         self.CANCER_CODE_dict = json.loads(data)
-
         self.num_tasks = len(self.CANCER_CODE_dict)
+
         self.num_time_steps= len(self.args.month_endpoints)
 
         if(preprocess_data==True):
@@ -59,6 +56,10 @@ class DiseaseProgressionDataset(data.Dataset):
             #while in an earlier sorting was not necessary, we now have to restore the row order
             #possibly due to pyarrow update
             self.events.sort_values(by=['patient_id', 'admit_date', 'is_valid_traj'],inplace=True)
+
+            #we do not need the patient_id anymore
+            self.events.drop(columns=['patient_id'], inplace=True)
+
             self.patients_with_valid_trajectories = pq.read_table(self.path_to_data_parquet + self.split_group + '_patients/').to_pandas()
 
         total_positive = self.patients_with_valid_trajectories['y'].sum()

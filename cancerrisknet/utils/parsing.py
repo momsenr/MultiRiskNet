@@ -33,7 +33,6 @@ def parse_args(args_str=None):
                         help="Name of dataset to use. Default: 'disease_preogression")
     parser.add_argument('--metadata_path', type=str, default='data/metadata.json', help="Path of json source datafile")
     parser.add_argument('--cancer_code_dict_path', type=str, default='data/cancer_code_dict_path.json', help="Path of json source cancer_code_dict_path")
-    parser.add_argument('--num_tasks', type=int, default=2,help="Number of tasks")
     parser.add_argument('--data_setting_path', type=str, default='data/settings.yaml',
                         help="Path of yaml with data specific settings")
     parser.add_argument('--month_endpoints', nargs='+', type=int, default=[3, 6, 12, 36, 60, 120],
@@ -140,6 +139,7 @@ def parse_args(args_str=None):
     with open(args.cancer_code_dict_path, 'r') as file:
         data = file.read()
     CANCER_CODE_dict = json.loads(data)
+    args.num_tasks = len(CANCER_CODE_dict)
 
     # Check whether the current args is legal.
     if args.train:
