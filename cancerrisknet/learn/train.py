@@ -112,7 +112,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
             exams: exam ids for samples if available, used to cluster samples for evaluation.
     """
     data_iter = data_loader.__iter__()
-    preds = []
     probs = []
     censor_times = []
     days_to_final_censors = []
@@ -120,7 +119,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
     golds = []
     patient_golds = []
     losses = []
-    #exams = []
     pids = []
     logger = TimeLogger(args, args.time_logger_step) if args.time_logger_verbose >= 3 else TimeLogger(args, 0)
 
@@ -154,7 +152,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         logger.log("prepare data")
         step_results = model_step(batch, models, train, args)
 
-        loss, batch_preds, batch_probs, batch_golds, batch_patient_golds, batch_pids, batch_censors, \
+        loss, batch_probs, batch_golds, batch_patient_golds, batch_pids, batch_censors, \
             batch_days_to_censor, batch_dates = step_results
         batch_loss += loss.cpu().data.item()
         logger.log("model step")
@@ -166,7 +164,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         losses.append(batch_loss)
         batch_loss = 0
 
-        preds.extend(batch_preds)
         probs.extend(batch_probs)
         golds.extend(batch_golds)
         patient_golds.extend(batch_patient_golds)
@@ -186,7 +183,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
     avg_loss = np.mean(losses)
 
-    return avg_loss, golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates
+    return avg_loss, golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates
 
 
 def prepare_batch(batch, args):
@@ -214,7 +211,7 @@ def eval_model(eval_data, name, models, args):
     logger_eval.log('Load eval data')
 
 
-    loss, golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates = run_epoch(
+    loss, golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates = run_epoch(
         data_loader,
         train=False,
         truncate_epoch=(not args.exhaust_dataloader and eval_data.split_group != 'test'),
