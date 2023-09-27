@@ -69,7 +69,6 @@ def model_step(batch, models, train_model, args, task_weights=None):
     # Use sigmoid for multi-label tasks and convert to numpy
     probs = torch.sigmoid(
         logits).cpu().data.numpy()  # Shape is T, B, len(args.month_endpoints) where T is number of tasks
-    preds = probs > .5
     golds = batch['y'].data.cpu().numpy()  # This is a 2D tensor with tasks as the first dimension
     patient_golds = batch['future_panc_cancer'].data.cpu().numpy() # This is a 2D tensor with tasks as the first dimension
     pids = batch['patient_id'].cpu().numpy()
@@ -77,4 +76,4 @@ def model_step(batch, models, train_model, args, task_weights=None):
     days_to_censor = batch['days_to_censor'].cpu().numpy()
     dates = batch['admit_date'].cpu().numpy()
 
-    return loss, preds, probs, golds, patient_golds, pids, censor_times, days_to_censor, dates
+    return loss, probs, golds, patient_golds, pids, censor_times, days_to_censor, dates
