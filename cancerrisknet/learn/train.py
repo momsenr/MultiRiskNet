@@ -131,7 +131,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         else:
             models[name].eval()
 
-    batch_loss = 0
     num_batches_per_epoch = len(data_loader)
 
     if truncate_epoch:
@@ -147,14 +146,20 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         if tqdm_bar.n > num_batches_per_epoch:
             break
 
+        golds.extend(batch['y'].data.numpy())
+        patient_golds.extend(batch['future_cancer_tensor'].data.numpy())
+        dates.extend(batch['admit_date'].data.numpy())
+        censor_times.extend(batch['time_at_event'].data.numpy())
+        days_to_final_censors.extend(batch['days_to_censor'].data.numpy())
+        pids.extend(batch['patient_id'].data.numpy())
+
         batch = prepare_batch(batch, args)
         logger.newline()
         logger.log("prepare data")
         step_results = model_step(batch, models, train, args)
 
-        loss, batch_probs, batch_golds, batch_patient_golds, batch_pids, batch_censors, \
-            batch_days_to_censor, batch_dates = step_results
-        batch_loss += loss.cpu().data.item()
+        loss, batch_probs = step_results
+        batch_loss = loss
         logger.log("model step")
         if train:
             optimizers[args.model_name].step()
@@ -162,16 +167,8 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
         logger.log("model update")
         losses.append(batch_loss)
-        batch_loss = 0
-
         probs.extend(batch_probs)
-        golds.extend(batch_golds)
-        patient_golds.extend(batch_patient_golds)
-        dates.extend(batch_dates)
-        censor_times.extend(batch_censors)
-        days_to_final_censors.extend(batch_days_to_censor)
-        #exams.extend(batch_exams)
-        pids.extend(batch_pids)
+
         logger.log("saving results")
 
         i += 1
