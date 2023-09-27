@@ -71,7 +71,7 @@ def model_step(batch, models, train_model, args, task_weights=None):
         logits).cpu().data.numpy()  # Shape is T, B, len(args.month_endpoints) where T is number of tasks
     preds = probs > .5
     golds = batch['y'].data.cpu().numpy()  # This is a 2D tensor with tasks as the first dimension
-    patient_golds = batch['future_panc_cancer'].data.cpu().numpy() # This is a 2D tensor with tasks as the first dimension
+    patient_golds = batch['future_cancer_tensor'].data.cpu().numpy() # This is a 2D tensor with tasks as the first dimension
     pids = batch['patient_id'].cpu().numpy()
     censor_times = batch['time_at_event'].cpu().numpy()
     days_to_censor = batch['days_to_censor'].cpu().numpy()

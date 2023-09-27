@@ -136,7 +136,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'y_seq': y_seq,
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
-                'future_panc_cancer': future_cancer_tensor,
+                'future_cancer_tensor': future_cancer_tensor,
                 'patient_id': patient_id, #used to be patient_index
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
@@ -245,7 +245,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'age_seq': pad_arr(age_seq, self.args.pad_size, np.zeros(self.args.time_embed_dim)),
                 'code_str': code_str
             }
-            for key in ['y', 'y_seq', 'y_mask', 'time_at_event', 'admit_date', 'age', 'future_panc_cancer',
+            for key in ['y', 'y_seq', 'y_mask', 'time_at_event', 'admit_date', 'age', 'future_cancer_tensor',
                         'days_to_censor', 'patient_id']:
                 item[key] = sample[key]
             items.append(item)

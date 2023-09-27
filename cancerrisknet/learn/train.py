@@ -38,7 +38,7 @@ def train_model(train_data, dev_data, model, args):
         for mode, data_loader in [('Train', train_data_loader), ('Dev', dev_data_loader)]:
             if_train = mode == 'Train'
             key_prefix = mode.lower()
-            loss,  golds, patient_golds, preds, probs, pids, censor_times, days_to_final_censors, dates = \
+            loss,  golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
                           optimizers=optimizers, args=args)
             logger_epoch.log("Run epoch ({})".format(key_prefix))
@@ -190,8 +190,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
 
 def prepare_batch(batch, args):
-    keys_of_interest = ['x', 'y', 'y_seq', 'y_mask', 'time_seq', 'age', 'age_seq']#, 'time_at_event',
-                       # 'future_panc_cancer', 'days_to_censor']
+    keys_of_interest = ['x', 'y', 'y_seq', 'y_mask', 'time_seq', 'age', 'age_seq']
 
     for key in batch.keys():
         if key in keys_of_interest:
