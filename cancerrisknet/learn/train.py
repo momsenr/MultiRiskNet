@@ -139,35 +139,36 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         logger.log("Truncate epoch @ batches: {}".format(num_batches_per_epoch))
     i = 0
     tqdm_bar = tqdm(data_iter, total=num_batches_per_epoch)
+
     for batch in data_iter:
         if batch is None:
             warnings.warn('Empty batch')
             continue
         if tqdm_bar.n > num_batches_per_epoch:
             break
-
-        golds.extend(batch['y'].data.numpy())
-        patient_golds.extend(batch['future_cancer_tensor'].data.numpy())
-        dates.extend(batch['admit_date'].data.numpy())
-        censor_times.extend(batch['time_at_event'].data.numpy())
-        days_to_final_censors.extend(batch['days_to_censor'].data.numpy())
-        pids.extend(batch['patient_id'].data.numpy())
+        
+        with torch.no_grad():
+            golds.extend(batch['y'].data.numpy())
+            patient_golds.extend(batch['future_cancer_tensor'].data.numpy())
+            dates.extend(batch['admit_date'].data.numpy())
+            censor_times.extend(batch['time_at_event'].data.numpy())
+            days_to_final_censors.extend(batch['days_to_censor'].data.numpy())
+            pids.extend(batch['patient_id'].data.numpy())
 
         batch = prepare_batch(batch, args)
         logger.newline()
         logger.log("prepare data")
-        step_results = model_step(batch, models, train, args)
+        loss, batch_probs = model_step(batch, models, train, args)
 
-        loss, batch_probs = step_results
-        batch_loss = loss
         logger.log("model step")
         if train:
             optimizers[args.model_name].step()
             optimizers[args.model_name].zero_grad()
 
         logger.log("model update")
-        losses.append(batch_loss)
-        probs.extend(batch_probs)
+        with torch.no_grad():
+            losses.append(loss)
+            probs.extend(batch_probs)
 
         logger.log("saving results")
 
@@ -179,16 +180,17 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         tqdm_bar.update()
 
     avg_loss = np.mean(losses)
-
     return avg_loss, golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates
 
 
 def prepare_batch(batch, args):
-    keys_of_interest = ['x', 'y', 'y_seq', 'y_mask', 'time_seq', 'age', 'age_seq']
-
+    to_gpu = ['x', 'y', 'time_seq', 'age', 'age_seq']
+    to_gpu_convert_to_float = ['y_seq', 'y_mask']
     for key in batch.keys():
-        if key in keys_of_interest:
+        if key in to_gpu:
             batch[key] = batch[key].to(args.device)
+        elif key in to_gpu_convert_to_float:
+            batch[key] = batch[key].float().to(args.device)
     return batch
 
 def eval_model(eval_data, name, models, args):
