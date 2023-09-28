@@ -148,12 +148,12 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
             break
         
         with torch.no_grad():
-            golds.extend(batch['y'].data.numpy())
-            patient_golds.extend(batch['future_cancer_tensor'].data.numpy())
-            dates.extend(batch['admit_date'].data.numpy())
-            censor_times.extend(batch['time_at_event'].data.numpy())
-            days_to_final_censors.extend(batch['days_to_censor'].data.numpy())
-            pids.extend(batch['patient_id'].data.numpy())
+            golds.extend(batch['y'].data.numpy().astype(bool))
+            patient_golds.extend(batch['future_cancer_tensor'].data.numpy().astype(bool))
+            dates.extend(batch['admit_date'].data.numpy().astype(int))
+            censor_times.extend(batch['time_at_event'].data.numpy().astype(int))
+            days_to_final_censors.extend(batch['days_to_censor'].data.numpy().astype(int))
+            pids.extend(batch['patient_id'].data.numpy().astype(int))
 
         batch = prepare_batch(batch, args)
         logger.newline()
