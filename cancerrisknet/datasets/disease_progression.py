@@ -89,7 +89,6 @@ class DiseaseProgressionDataset(data.Dataset):
 
         patient_trajectories=self.events.iloc[self.patients_with_valid_trajectories.iloc[patient_index]['first_row']:self.patients_with_valid_trajectories.iloc[patient_index]['last_row']+1].copy()
         patient_trajectories.reset_index(inplace=True)
-        
 
         #find the indices where the patient has a valid trajectory
         valid_indices = patient_trajectories[patient_trajectories['is_valid_traj']==True].index.tolist()
@@ -101,17 +100,8 @@ class DiseaseProgressionDataset(data.Dataset):
                 selected_idx = valid_indices[-self.args.max_eval_indices:]
 
         else:
-            try:
-                selected_idx = [random.choice(valid_indices)]
-            except:
-                print(patient_id)
-                print(self.patients_with_valid_trajectories.iloc[patient_index])
-                print(patient_trajectories)
-                exit
-
+            selected_idx = [random.choice(valid_indices)]
         samples = []
-
-
 
         for idx in selected_idx:
             events_to_date = patient_trajectories.iloc[:idx + 1]
@@ -137,13 +127,14 @@ class DiseaseProgressionDataset(data.Dataset):
                 'y_mask': y_mask,
                 'time_at_event': time_at_event,
                 'future_cancer_tensor': future_cancer_tensor,
-                'patient_id': patient_id, #used to be patient_index
+                'patient_id': patient_id,
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
                 'age_seq': age_seq,
                 'age': age,
                 'admit_date': last_event['admit_date']#.isoformat())
             })
+
         return samples
 
     def get_time_seq(self, deltas):
@@ -155,7 +146,7 @@ class DiseaseProgressionDataset(data.Dataset):
         ))
 
         positional_embeddings = np.cos(deltas.reshape(-1, 1) * multipliers.reshape(1, -1))
-        return deltas.max(), positional_embeddings
+        return deltas.max().astype(int), positional_embeddings
 
 
     def class_count(self):
@@ -210,8 +201,8 @@ class DiseaseProgressionDataset(data.Dataset):
 
         # Initialize multi-task arrays
         y_array = np.zeros(self.num_tasks, dtype=bool)
-        y_seq_array = np.zeros((self.num_tasks, self.num_time_steps))
-        y_mask_array = np.zeros((self.num_tasks, self.num_time_steps))
+        y_seq_array = np.zeros((self.num_tasks, self.num_time_steps), dtype=bool)
+        y_mask_array = np.zeros((self.num_tasks, self.num_time_steps), dtype=bool)
 
         if last_event['is_pos_in_time_horizon']:
             time_at_event = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor < (mo * 30)])
@@ -222,10 +213,10 @@ class DiseaseProgressionDataset(data.Dataset):
             y_array[task_idx] = last_event['is_pos_in_time_horizon'] and last_event[f'future_{key}_patient']
 
             if y_array[task_idx]:
-                y_seq_array[task_idx, time_at_event:] = 1
-            y_mask_array[task_idx, :time_at_event + 1] = 1
-
-        return y_array, y_seq_array.astype('float64'), y_mask_array.astype('float64'), time_at_event, days_to_censor
+                y_seq_array[task_idx, time_at_event:] = True
+            y_mask_array[task_idx, :time_at_event + 1] = True
+        return y_array, y_seq_array, y_mask_array, time_at_event, days_to_censor   
+        #return y_array, y_seq_array.astype('float64'), y_mask_array.astype('float64'), time_at_event, days_to_censor
 
     def __len__(self):
         return len(self.patients_with_valid_trajectories)
