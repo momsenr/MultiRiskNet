@@ -15,8 +15,7 @@ class CumulativeProbabilityLayer(nn.Module):
         else:
             self.monotonicity_activation = nn.ReLU(inplace=True)
         mask = torch.ones([max_followup, max_followup])
-        mask = torch.tril(mask, diagonal=0)
-        mask = torch.nn.Parameter(torch.t(mask), requires_grad=False)
+        mask = torch.triu(mask, diagonal=0)
         self.register_parameter('upper_triagular_mask', mask)
 
     def hazards(self, x):
@@ -87,7 +86,7 @@ class MultiTaskCumulativeProbabilityLayer(nn.Module):
 
         # Adjusted mask for multiple tasks
         mask = torch.ones([max_followup, max_followup])
-        mask = torch.tril(mask, diagonal=0)
+        mask = torch.triu(mask, diagonal=0)
         mask = torch.nn.Parameter(mask.unsqueeze(0).expand(self.args.num_tasks, -1, -1), requires_grad=False)
         self.register_parameter('upper_triagular_mask', mask)
 
