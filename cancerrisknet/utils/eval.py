@@ -44,6 +44,13 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
 
     log_statement = '-- loss: {:.6f}'.format(loss)
 
+    sum_auprc=0
+    sum_auroc=0
+    sum_mcc=0
+    weighed_sum_auprc=0
+    weighed_sum_auroc=0
+    weighed_sum_mcc=0
+
     for index, time in enumerate(args.month_endpoints):
         probs_for_eval, golds_for_eval = get_probs_golds(preds_dict, index=index)
 
@@ -52,23 +59,52 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
             auc = compute_auroc(golds_for_eval, probs_for_eval)
             log_statement += " -{}: {} (n={} , c={} )".format(key_name, auc, len(golds_for_eval), sum(golds_for_eval))
             stats_dict[key_name].append(auc)
+            sum_auroc+=auc
+            weighed_sum_auroc+=auc*(sum(golds_for_eval)/len(golds_for_eval))
 
         if args.eval_auprc:
             key_name = '{}_{}month_auprc'.format(key_prefix, time)
             auc = compute_auprc(golds_for_eval, probs_for_eval)
             log_statement += " -{}: {} (n={} , c={} )".format(key_name, auc, len(golds_for_eval), sum(golds_for_eval))    
             stats_dict[key_name].append(auc)
+            sum_auprc+=auc
+            weighed_sum_auprc+=auc*(sum(golds_for_eval)/len(golds_for_eval))
 
         if args.eval_mcc:
             key_name = '{}_{}month_mcc'.format(key_prefix, time)
             mcc = compute_mcc(golds_for_eval, probs_for_eval)
             log_statement += " -{}: {} (n={} , c={} )".format(key_name, mcc, len(golds_for_eval), sum(golds_for_eval))
             stats_dict[key_name].append(mcc)
+            sum_mcc+=mcc
+            weighed_sum_mcc+=mcc*(sum(golds_for_eval)/len(golds_for_eval))
+
+    if args.eval_auroc:
+        key_name_auroc_sum = '{}_sum_auroc'.format(key_prefix)
+        key_name_weighed_auroc_sum = '{}_weighed_sum_auroc'.format(key_prefix)
+        log_statement += " -{}: {} ".format(key_name_auroc_sum, sum_auroc)
+        log_statement += " -{}: {} ".format(key_name_weighed_auroc_sum, weighed_sum_auroc)
+        stats_dict[key_name_auroc_sum].append(sum_auroc)
+        stats_dict[key_name_weighed_auroc_sum].append(weighed_sum_auroc)
+    if args.eval_auprc:
+        key_name_auprc_sum = '{}_sum_auprc'.format(key_prefix)
+        key_name_weighed_auprc_sum = '{}_weighed_sum_auprc'.format(key_prefix)
+        log_statement += " -{}: {} ".format(key_name_auprc_sum, sum_auprc)   
+        log_statement += " -{}: {} ".format(key_name_weighed_auprc_sum, weighed_sum_auprc)
+        stats_dict[key_name_auprc_sum].append(sum_auprc)
+        stats_dict[key_name_weighed_auprc_sum].append(weighed_sum_auprc)
+    if args.eval_mcc:
+        key_name_mcc_sum = '{}_sum_mcc'.format(key_prefix)
+        key_name_weighed_mcc_sum = '{}_weighed_sum_mcc'.format(key_prefix)
+        log_statement += " -{}: {} ".format(key_name_mcc_sum, sum_mcc)   
+        log_statement += " -{}: {} ".format(key_name_weighed_mcc_sum, weighed_sum_mcc)
+        stats_dict[key_name_mcc_sum].append(sum_mcc)
+        stats_dict[key_name_weighed_mcc_sum].append(weighed_sum_mcc)
 
     if args.eval_c_index:
         c_index = compute_c_index(probs, censor_times, golds)
         stats_dict['{}_c_index'.format(key_prefix)].append(c_index)
         log_statement += " -c_index: {}".format(c_index)
+    
 
     return log_statement, stats_dict, preds_dict
 
@@ -87,10 +123,6 @@ def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids
         task_patient_golds = np.array([arr[task_idx] for arr in patient_golds]) 
         task_probs =  np.array([arr[task_idx] for arr in probs]) 
 
-        #task_golds = golds[:, task_idx]
-        #task_patient_golds = patient_golds[:, task_idx]
-        #task_probs = probs[:, task_idx]
-
         log_statement, task_stats_dict, task_preds_dict = compute_eval_metrics(
             args, loss, task_golds, task_patient_golds, task_probs, pids, dates, censor_times,
             days_to_final_censors, stats_dict, task_key_prefix
@@ -100,13 +132,62 @@ def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids
         all_stats_dicts.append(task_stats_dict)
         all_preds_dicts.append(task_preds_dict)
 
-    # Combine all task log statements into one
-    combined_log_statement = "\n".join(all_log_statements)
 
-    # Combine all stats_dicts and preds_dicts (This is just one way to combine, adjust as needed)
+
+    # Combine all stats_dicts and preds_dicts
     for d in all_stats_dicts:
         stats_dict.update(d)
+
+    sum_auroc=0
+    sum_auprc=0
+    sum_mcc=0
+    weighed_sum_auroc=0
+    weighed_sum_auprc=0
+    weighed_sum_mcc=0
+    for task_idx in range(args.num_tasks):
+        task_key_prefix = f"{key_prefix}_task{task_idx}" 
+        if args.eval_auroc:
+            key=task_key_prefix+"_sum_auroc"
+            weighed_key=task_key_prefix+"_weighed_sum_auroc"
+            sum_auroc+=stats_dict[key][-1]
+            weighed_sum_auroc+=stats_dict[weighed_key][-1]
+        if args.eval_auprc:
+            key=task_key_prefix+"_sum_auprc"
+            weighed_key=task_key_prefix+"_weighed_sum_auprc"
+            sum_auprc+=stats_dict[key][-1]
+            weighed_sum_auprc+=stats_dict[weighed_key][-1]
+        if args.eval_mcc:
+            key=task_key_prefix+"_sum_mcc"
+            weighed_key=task_key_prefix+"_weighed_sum_mcc"
+            sum_mcc+=stats_dict[key][-1]
+            weighed_sum_mcc+=stats_dict[weighed_key][-1]
+    
+    if args.eval_auroc:
+        key_name_auroc_sum = '{}_all_tasks_sum_auroc'.format(key_prefix)
+        key_name_weighed_sum_auroc = '{}_all_tasks_weighed_sum_auroc'.format(key_prefix)
+        all_log_statements.append(" -{}: {} ".format(key_name_auroc_sum, sum_auroc))
+        all_log_statements.append(" -{}: {} ".format(key_name_weighed_sum_auroc, weighed_sum_auroc))
+        stats_dict[key_name_auroc_sum].append(sum_auroc)
+        stats_dict[key_name_weighed_sum_auroc].append(weighed_sum_auroc)
+    if args.eval_auprc:
+        key_name_auprc_sum = '{}_all_tasks_sum_auprc'.format(key_prefix)
+        key_name_weighed_sum_auprc = '{}_all_tasks_weighed_sum_auprc'.format(key_prefix)
+        all_log_statements.append(" -{}: {} ".format(key_name_auprc_sum, sum_auprc))
+        all_log_statements.append(" -{}: {} ".format(key_name_weighed_sum_auprc, weighed_sum_auprc))
+        stats_dict[key_name_auprc_sum].append(sum_auprc)
+        stats_dict[key_name_weighed_sum_auprc].append(weighed_sum_auprc)
+    if args.eval_mcc:
+        key_name_mcc_sum = '{}_all_tasks_sum_mcc'.format(key_prefix)
+        key_name_weighed_sum_mcc = '{}_all_tasks_weighed_sum_mcc'.format(key_prefix)
+        all_log_statements.append(" -{}: {} ".format(key_name_mcc_sum, sum_mcc))
+        all_log_statements.append(" -{}: {} ".format(key_name_weighed_sum_mcc, weighed_sum_mcc))
+        stats_dict[key_name_mcc_sum].append(sum_mcc)
+        stats_dict[key_name_weighed_sum_mcc].append(weighed_sum_mcc)
+    
     combined_preds_dict = {key: [d[key] for d in all_preds_dicts] for key in all_preds_dicts[0]}
+    
+    # Combine all task log statements into one
+    combined_log_statement = "\n".join(all_log_statements)
 
     return combined_log_statement, stats_dict, combined_preds_dict
 
