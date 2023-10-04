@@ -18,6 +18,7 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
 
     y_seq = batch['y_seq']
     y_mask = batch['y_mask']
+
     # If no specific task weights are provided, assume equal weights for all tasks.
     if task_weights is None:
         task_weights = torch.ones(logits.shape[1]).to(logits.device)
@@ -28,16 +29,15 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
         # Compute BCE loss for all tasks
         losses = F.binary_cross_entropy_with_logits(logits, y_seq, weight=y_mask, reduction='none')
         # Sum over the sequence dimension and then divide by the sum of the masks for each task
-        losses = torch.sum(losses, dim=-1) / torch.sum(y_mask, dim=-1)
+        losses = torch.sum(losses, dim=(0,2)) / torch.sum(y_mask, dim=(0,2))
     elif args.loss_fn == 'mse':
         # Compute MSE loss for all tasks, adjust to sum the losses and then average over tasks
         losses = F.mse_loss(logits, y_seq, reduction='sum').div(logits.shape[1])
     else:
         raise Exception('Loss function is illegal or not found.')
-    # Weighted sum of all task losses
-    total_loss = torch.sum(task_weights * losses)
 
-    return total_loss
+    # Weighted sum of all task losses
+    return torch.sum(task_weights * losses)/torch.sum(task_weights)
 
 def model_step(batch, models, train_model, args, task_weights=None):
     """
