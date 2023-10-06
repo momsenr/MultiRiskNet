@@ -185,10 +185,10 @@ if __name__ == "__main__":
         for task_idx in range(num_tasks):
             task_golds = test_preds['golds'][task_idx]
             task_probs =  test_preds['probs'][task_idx]
-            task_censor_times =  test_preds['censor_times'][task_idx]
+            task_censor_time_indices =  test_preds['censor_time_indices'][task_idx]
             task_preds_dict = {'golds': task_golds,
                 'probs': task_probs,
-                'censor_times': task_censor_times,
+                'censor_time_indices': task_censor_time_indices,
             }
             for index, month in enumerate(results['month_endpoints']):
                 probs_for_eval, golds_for_eval = get_probs_golds(task_preds_dict, index=index)
