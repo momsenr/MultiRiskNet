@@ -19,8 +19,8 @@ def get_probs_golds(test_preds, index=4):
     """
 
     probs_for_eval, golds_for_eval = [], []
-    for prob_arr, censor_time, gold in zip(test_preds["probs"], test_preds["censor_times"], test_preds["golds"]):
-        include, label = include_exam_and_determine_label(index, censor_time, gold)
+    for prob_arr, censor_time_index, gold in zip(test_preds["probs"], test_preds["censor_time_indices"], test_preds["golds"]):
+        include, label = include_exam_and_determine_label(index, censor_time_index, gold)
         if include:
             probs_for_eval.append(prob_arr[index])
             golds_for_eval.append(label)
@@ -28,7 +28,7 @@ def get_probs_golds(test_preds, index=4):
     return probs_for_eval, golds_for_eval
 
 
-def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, censor_times,
+def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, censor_time_indices,
                          days_to_final_censors, stats_dict, key_prefix):
     
     stats_dict['{}_loss'.format(key_prefix)].append(loss)
@@ -38,7 +38,7 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
         'patient_golds': patient_golds,
         'pids': pids,
         'dates': dates,
-        'censor_times': censor_times,
+        'censor_time_indices': censor_time_indices,
         'days_to_final_censors': days_to_final_censors
     }
 
@@ -101,7 +101,7 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
         stats_dict[key_name_weighed_mcc_sum].append(weighed_sum_mcc)
 
     if args.eval_c_index:
-        c_index = compute_c_index(probs, censor_times, golds)
+        c_index = compute_c_index(probs, censor_time_indices, golds)
         stats_dict['{}_c_index'.format(key_prefix)].append(c_index)
         log_statement += " -c_index: {}".format(c_index)
     
@@ -109,8 +109,8 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
     return log_statement, stats_dict, preds_dict
 
 
-def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids, dates, censor_times,
-                                   days_to_final_censors, stats_dict, key_prefix):
+def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids, dates, censor_time_indices, days_to_final_censors
+                                    , stats_dict, key_prefix):
     all_log_statements = []
     all_stats_dicts = []
     all_preds_dicts = []
@@ -122,9 +122,12 @@ def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids
         task_golds = np.array([arr[task_idx] for arr in golds])
         task_patient_golds = np.array([arr[task_idx] for arr in patient_golds]) 
         task_probs =  np.array([arr[task_idx] for arr in probs]) 
+        task_censor_time_indices = np.array([arr[task_idx] for arr in censor_time_indices])
+        
+
 
         log_statement, task_stats_dict, task_preds_dict = compute_eval_metrics(
-            args, loss, task_golds, task_patient_golds, task_probs, pids, dates, censor_times,
+            args, loss, task_golds, task_patient_golds, task_probs, pids, dates, task_censor_time_indices,
             days_to_final_censors, stats_dict, task_key_prefix
         )
 
@@ -192,13 +195,13 @@ def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids
     return combined_log_statement, stats_dict, combined_preds_dict
 
 
-def include_exam_and_determine_label(followup, censor_time, gold, cumulative_prediction_interval=True):
+def include_exam_and_determine_label(followup, censor_time_index, gold, cumulative_prediction_interval=True):
     """
         Determine if a given prediction should be evaluated in this pass.
 
     Args:
         followup:
-        censor_time: the position at which the prediction vector (default: [3,6,12,36,60]) is evaluated.
+        censor_time_index: the position at which the prediction vector (default: [3,6,12,36,60]) is evaluated.
         gold: the ground truth (whether this trajectory is associated with a cancer dianosis or not.
         cumulative_prediction_interval: One of ['c', 'i'].
                                         If 'c' then evalute for the time interval *up to a given time point*,
@@ -209,17 +212,17 @@ def include_exam_and_determine_label(followup, censor_time, gold, cumulative_pre
                                                  time of assessment.
     """
     if cumulative_prediction_interval:
-        valid_pos = gold and censor_time <= followup
+        valid_pos = gold and censor_time_index <= followup
     else:
-        valid_pos = gold and censor_time == followup
-    valid_neg = censor_time >= followup
+        valid_pos = gold and censor_time_index == followup
+    valid_neg = censor_time_index >= followup
     included, label = (valid_pos or valid_neg), valid_pos
     return included, label
 
 
-def compute_c_index(probs, censor_times, golds):
+def compute_c_index(probs, censor_time_indices, golds):
     try:
-        c_index = concordance_index(censor_times, probs, golds)
+        c_index = concordance_index(censor_time_indices, probs, golds)
     except Exception as e:
         warnings.warn("Failed to calculate C-index because {}".format(e))
         c_index = 'NA'
