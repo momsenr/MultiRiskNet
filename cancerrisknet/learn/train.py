@@ -38,13 +38,13 @@ def train_model(train_data, dev_data, model, args):
         for mode, data_loader in [('Train', train_data_loader), ('Dev', dev_data_loader)]:
             if_train = mode == 'Train'
             key_prefix = mode.lower()
-            loss,  golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates = \
+            loss,  golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
                           optimizers=optimizers, args=args)
             logger_epoch.log("Run epoch ({})".format(key_prefix))
 
             log_statement, epoch_stats, _ = compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs,
-                                                                 pids, dates, censor_times, days_to_final_censors,
+                                                                 pids, dates, censor_time_indices, days_to_final_censors,
                                                                  epoch_stats, key_prefix)
             logger_epoch.log("Compute eval metrics ({})".format(key_prefix))
             print(log_statement)
@@ -113,7 +113,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
     """
     data_iter = data_loader.__iter__()
     probs = []
-    censor_times = []
+    censor_time_indices = []
     days_to_final_censors = []
     dates = []
     golds = []
@@ -149,9 +149,9 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         
         with torch.no_grad():
             golds.extend(batch['y'].data.numpy().astype(bool))
-            patient_golds.extend(batch['future_cancer_tensor'].data.numpy().astype(bool))
+            patient_golds.extend(batch['future_cancer_array'].data.numpy().astype(bool))
             dates.extend(batch['admit_date'].data.numpy().astype(int))
-            censor_times.extend(batch['time_at_event'].data.numpy().astype(int))
+            censor_time_indices.extend(batch['time_index_at_event'].data.numpy().astype(int))
             days_to_final_censors.extend(batch['days_to_censor'].data.numpy().astype(int))
             pids.extend(batch['patient_id'].data.numpy().astype(int))
 
@@ -180,7 +180,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         tqdm_bar.update()
 
     avg_loss = np.mean(losses)
-    return avg_loss, golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates
+    return avg_loss, golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates
 
 
 def prepare_batch(batch, args):
@@ -210,7 +210,7 @@ def eval_model(eval_data, name, models, args):
     logger_eval.log('Load eval data')
 
 
-    loss, golds, patient_golds, probs, pids, censor_times, days_to_final_censors, dates = run_epoch(
+    loss, golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = run_epoch(
         data_loader,
         train=False,
         truncate_epoch=(not args.exhaust_dataloader and eval_data.split_group != 'test'),
@@ -226,7 +226,7 @@ def eval_model(eval_data, name, models, args):
     log_statement, eval_stats, eval_preds = compute_eval_metrics_multitask(
                             args, loss,
                             golds, patient_golds, probs, pids, dates,
-                            censor_times, days_to_final_censors, eval_stats, name)
+                            censor_time_indices, days_to_final_censors, eval_stats, name)
     print(log_statement)
     logger_eval.log('Compute eval metrics')
     logger_eval.update()
