@@ -62,9 +62,13 @@ class DiseaseProgressionDataset(data.Dataset):
 
             self.patients_with_valid_trajectories = pq.read_table(self.path_to_data_parquet + self.split_group + '_patients/').to_pandas()
 
-        total_positive = self.patients_with_valid_trajectories['y'].sum()
         print("Total number of patients  in '{}' dataset is: {}.".format(self.split_group, len(self.patients_with_valid_trajectories)))
-        print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
+        #total_positive = self.patients_with_valid_trajectories['y'].sum()
+        for key in self.CANCER_CODE_dict.keys():
+            total_positive = self.patients_with_valid_trajectories[f'y_{key}'].sum()
+            print("Number of positive patients for cancer type '{}' in '{}' dataset is: {}.".format(key, self.split_group, total_positive))
+
+        #print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
 
     def process_events(self, events):
@@ -85,8 +89,8 @@ class DiseaseProgressionDataset(data.Dataset):
         #we currently do not need the actual patient_id and instead work with the patient_index
         #patient_id is the identifier in MarketScan, whereas patient_index is the index in the patients_with_valid_trajectories table
 
-        patient_id= self.patients_with_valid_trajectories.iloc[patient_index]['patient_id']
-
+        patient= self.patients_with_valid_trajectories.iloc[patient_index]
+        patient_id= patient['patient_id']
         patient_trajectories=self.events.iloc[self.patients_with_valid_trajectories.iloc[patient_index]['first_row']:self.patients_with_valid_trajectories.iloc[patient_index]['last_row']+1].copy()
         patient_trajectories.reset_index(inplace=True)
 
@@ -103,14 +107,14 @@ class DiseaseProgressionDataset(data.Dataset):
             selected_idx = [random.choice(valid_indices)]
         samples = []
 
+
+        future_cancer_array = np.zeros((self.num_tasks, 1), dtype=bool)
+        for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
+            future_cancer_array[task_idx] = patient[f'y_{key}']
+
         for idx in selected_idx:
             events_to_date = patient_trajectories.iloc[:idx + 1]
             last_event = events_to_date.iloc[-1]
-
-            #TODO: if we run into speed issues, we could try to find an elegant solution to move this out of the loop
-            future_cancer_tensor = np.zeros((self.num_tasks, 1), dtype=bool)
-            for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
-                future_cancer_tensor[task_idx] = last_event[f'future_{key}_patient']
 
             deltas_admitdate = np.abs(last_event['admit_date']-events_to_date['admit_date'])
             _, time_seq = self.get_time_seq(deltas_admitdate.values)
@@ -118,15 +122,15 @@ class DiseaseProgressionDataset(data.Dataset):
 
             codes = events_to_date['code'].tolist()
 
-            y, y_seq, y_mask, time_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
+            y, y_seq, y_mask, time_index_at_event, days_to_censor = self.get_label(events_to_date, until_idx=idx)
 
             samples.append({
                 'codes': codes,
                 'y': y,
                 'y_seq': y_seq,
                 'y_mask': y_mask,
-                'time_at_event': time_at_event,
-                'future_cancer_tensor': future_cancer_tensor,
+                'time_index_at_event': time_index_at_event,
+                'future_cancer_array': future_cancer_array,
                 'patient_id': patient_id,
                 'days_to_censor': days_to_censor,
                 'time_seq': time_seq,
@@ -153,8 +157,20 @@ class DiseaseProgressionDataset(data.Dataset):
         """
         Calculates the weights used by WeightedRandomSampler for balancing the batches.
         """
-        #Todo: at a later stage, we should weigh per cancer - currently we do not balance the cancers between them
-        ys = self.patients_with_valid_trajectories['y']
+        # Initialize a list to store arrays of weights for each task
+        task_weights = []
+        self.patients_with_valid_trajectories['label'] = 0
+
+        # Update the 'label' column based on the rules
+        for idx, key in enumerate(self.CANCER_CODE_dict.keys()):
+            y_key_col = f'y_{key}'
+    
+            # Update 'label' to idx+1 where 'label' is 0 and 'y_{key}' is True
+            mask = (self.patients_with_valid_trajectories['label'] == 0) & (self.patients_with_valid_trajectories[y_key_col] == True)
+            self.patients_with_valid_trajectories.loc[mask, 'label'] = idx + 1
+    
+        ys = self.patients_with_valid_trajectories['label']
+        self.patients_with_valid_trajectories.drop(columns=['label'], inplace=True)
         label_counts = Counter(ys)
         weight_per_label = 1. / len(label_counts)
         label_weights = {
@@ -174,49 +190,57 @@ class DiseaseProgressionDataset(data.Dataset):
             y (bool): True if the trajectory includes pancreatic cancer diagnosis within the time horizon,
                       False otherwise.
             y_seq (numpy.array): Used as golds in cumulative_probability_layer. An array of zeros with ones from
-                                 'time_at_event' to the end, indicating the occurrence of pancreatic cancer diagnosis.
+                                 'time_index_at_event' to the end, indicating the occurrence of pancreatic cancer diagnosis.
             y_mask (numpy.array): An array indicating how many years are left in the disease window. Contains ones
-                                  from the start to 'time_at_event' and zeros for the remaining duration.
+                                  from the start to 'time_index_at_event' and zeros for the remaining duration.
                                   (without linear interpolation, y_mask looks like the complement of y_seq)
-            time_at_event (int): The position in the time vector (default: [3, 6, 12, 36, 60]) which specifies the
+            time_index_at_event (int): The position in the time vector (default: [3, 6, 12, 36, 60]) which specifies the
                                  outcome_date.
             days_to_censor (int): Number of days between the outcome_date and the admit_date of the event.
 
         Examples:
             Ex1:  A partial disease trajectory that includes pancreatic cancer diagnosis between 6-12 months
                   after time of assessment.
-                time_at_event: 2
+                time_index_at_event: 2
                 y_seq: [0, 0, 1, 1, 1]
                 y_mask: [1, 1, 1, 0, 0]
 
             Ex2:  A partial disease trajectory from a patient who never gets pancreatic cancer diagnosis
                   but died between 36-60 months after time of assessment.
-                time_at_event: 1
+                time_index_at_event: 1
                 y_seq: [0, 0, 0, 0, 0]
                 y_mask: [1, 1, 1, 1, 0]
         """
 
         last_event = events_to_date.iloc[until_idx]
-        days_to_censor = last_event['outcome_day'] - last_event['admit_date']
+        days_to_censor_array = np.zeros(self.num_tasks, dtype=int)
+        time_index_at_event_array = np.zeros(self.num_tasks, dtype=int)
+        #days_to_censor = last_event['outcome_day'] - last_event['admit_date']
 
         # Initialize multi-task arrays
         y_array = np.zeros(self.num_tasks, dtype=bool)
         y_seq_array = np.zeros((self.num_tasks, self.num_time_steps), dtype=bool)
         y_mask_array = np.zeros((self.num_tasks, self.num_time_steps), dtype=bool)
 
-        if last_event['is_pos_in_time_horizon']:
-            time_at_event = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor < (mo * 30)])
-        else:
-            time_at_event = self.num_time_steps - 1
-
         for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
-            y_array[task_idx] = last_event['is_pos_in_time_horizon'] and last_event[f'future_{key}_patient']
+            days_to_censor_array[task_idx] = last_event[f'outcome_day_{key}'] - last_event['admit_date']
+            if last_event[f'is_pos_{key}_in_time_horizon']:
+                time_index_at_event_array[task_idx] = min([i for i, mo in enumerate(self.args.month_endpoints) if days_to_censor_array[task_idx] < (mo * 30)])
+            else:
+                time_index_at_event_array[task_idx] = self.num_time_steps - 1
 
+        #Todo: at a later stage, we should remove the colomn future_cancer_patient and instead use the label y in the 
+        # patient_with_valid_trajectories dataframe
+        for task_idx, key in enumerate(self.CANCER_CODE_dict.keys()):
+            y_array[task_idx] = last_event[f'is_pos_{key}_in_time_horizon'] and last_event[f'future_{key}_patient']
+
+
+            #TODO: can in the two-cancer case a problem occurr?
             if y_array[task_idx]:
-                y_seq_array[task_idx, time_at_event:] = True
-            y_mask_array[task_idx, :time_at_event + 1] = True
-        return y_array, y_seq_array, y_mask_array, time_at_event, days_to_censor   
-        #return y_array, y_seq_array.astype('float64'), y_mask_array.astype('float64'), time_at_event, days_to_censor
+                y_seq_array[task_idx, time_index_at_event_array[task_idx]:] = True
+            y_mask_array[task_idx, :time_index_at_event_array[task_idx] + 1] = True
+        return y_array, y_seq_array, y_mask_array, time_index_at_event_array, days_to_censor_array   
+        #return y_array, y_seq_array.astype('float64'), y_mask_array.astype('float64'), time_index_at_event, days_to_censor
 
     def __len__(self):
         return len(self.patients_with_valid_trajectories)
@@ -236,7 +260,7 @@ class DiseaseProgressionDataset(data.Dataset):
                 'age_seq': pad_arr(age_seq, self.args.pad_size, np.zeros(self.args.time_embed_dim)),
                 'code_str': code_str
             }
-            for key in ['y', 'y_seq', 'y_mask', 'time_at_event', 'admit_date', 'age', 'future_cancer_tensor',
+            for key in ['y', 'y_seq', 'y_mask', 'time_index_at_event', 'admit_date', 'age', 'future_cancer_array',
                         'days_to_censor', 'patient_id']:
                 item[key] = sample[key]
             items.append(item)
