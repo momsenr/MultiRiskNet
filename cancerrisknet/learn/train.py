@@ -83,7 +83,7 @@ def train_model(train_data, dev_data, model, args):
                     param_group['lr'] *= args.lr_decay
 
             # Update lr also in args for resumable usage
-            args.lr *= .5
+            args.lr *= args.lr_decay
             logger_epoch.log("Prepare for next epoch")
             logger_epoch.update()
 
@@ -92,7 +92,7 @@ def train_model(train_data, dev_data, model, args):
 
     return epoch_stats, models
 
-def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
+def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args, train_last_layer_only=False):
     """
         Run model for one pass of data_loader, and return epoch statistics.
         Args:
@@ -103,6 +103,8 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
                             necessarily spaning through the entire dataset.
             optimizers: dict of optimizers, one for each model
             args: general runtime args defined in by argparse
+            train_last_layer_only: If True, only train the last layer of the model. Only evaluated if train=True.
+
 
         Returns:
             avg_loss: epoch loss
@@ -162,8 +164,25 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
 
         logger.log("model step")
         if train:
-            optimizers[args.model_name].step()
-            optimizers[args.model_name].zero_grad()
+            if not train_last_layer_only:
+                optimizers[args.model_name].step()
+                optimizers[args.model_name].zero_grad()
+            else: 
+                # Freeze all layers except the last one
+                for name, param in model.named_parameters():
+                    if name != 'prob_of_failure_layer.weight' and name != 'prob_of_failure_layer.bias':
+                        param.requires_grad = False  
+                #print all layers that are frozen
+                for name, param in model.named_parameters():
+                    if param.requires_grad == False:
+                        print(name)
+                
+                optimizers[args.model_name].step()
+                optimizers[args.model_name].zero_grad()
+                # Unfreeze all layers
+                for name, param in model.named_parameters():
+                    param.requires_grad = True
+
 
         logger.log("model update")
         with torch.no_grad():
