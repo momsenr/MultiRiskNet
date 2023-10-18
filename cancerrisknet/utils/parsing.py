@@ -103,8 +103,11 @@ def parse_args(args_str=None):
     parser.add_argument('--momentum', type=float, default=0, help='Momentum to use with SGD')
     parser.add_argument('--weight_decay', type=float, default=0, help='L2 Regularization penaty [default: 0]')
     parser.add_argument('--patience', type=int, default=5,
-                        help='Number of epochs without improvement on dev before halving learning rate or early '
-                             'stopping. [default: 5]')
+                        help='Number of epochs without improvement on dev before reducing learning rate. [default: 5]')
+    parser.add_argument('--freeze_all_but_last_layer_after_epoch', type=int, default=20,
+                        help='Number of epochs after which all but the last layer will be frozen. Ignored unless freeze_all_but_last_layer is set to after_number_of_epochs. [default: 20]')
+    parser.add_argument('--freeze_all_but_last_layer', type=str, default='never',
+                        help='When to freeze all but last layer: never, after_number_of_epochs, when_reducing_lr.')
     parser.add_argument('--tuning_metric', type=str, default='36month_auroc',
                         help='Metric to judge dev set results. Possible options include auc, loss, accuracy and etc.')
     parser.add_argument('--epochs', type=int, default=20, help='Total number of epochs for training [default: 20].')
