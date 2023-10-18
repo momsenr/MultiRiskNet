@@ -10,13 +10,6 @@ from cancerrisknet.utils.time_logger import TimeLogger
 import warnings
 tqdm.monitor_interval = 0
 
-def update_optimizer(optimizer, model, layers_to_not_freeze):
-    new_params = [
-        param for name, param in model.named_parameters() if name in layers_to_not_freeze or param.requires_grad
-    ]
-    optimizer.param_groups[0]['params'] = new_params
-    return optimizer
-
 def train_model(train_data, dev_data, model, args):
     """
         Train model and tune on dev set using args.tuning_metric. If model doesn't improve dev performance within
@@ -53,23 +46,19 @@ def train_model(train_data, dev_data, model, args):
             key_prefix = mode.lower()
 
             if(train_only_last_layers and not layers_frozen):
-                    logger_epoch.log("Freezing all but last layers")
-                    layers_to_not_freeze = [
-                        'prob_of_failure_layer.hazard_fcs.weight', 
-                        'prob_of_failure_layer.hazard_fcs.bias',
-                        'prob_of_failure_layer.base_hazard_fcs.weight', 
-                        'prob_of_failure_layer.base_hazard_fcs.bias'
-                    ]
+                logger_epoch.log("Freezing all but last layers")
+                layers_to_not_freeze = [
+                    'prob_of_failure_layer.hazard_fcs.weight', 
+                    'prob_of_failure_layer.hazard_fcs.bias',
+                    'prob_of_failure_layer.base_hazard_fcs.weight', 
+                    'prob_of_failure_layer.base_hazard_fcs.bias'
+                ]
 
-                    for name, param in model.named_parameters():
+                for name, param in models[args.model_name].named_parameters():
+                    for param_group in optimizers[args.model_name].param_groups:
                         if name not in layers_to_not_freeze:
-                            param.requires_grad = False
-            
-                    # Update the optimizer to exclude the frozen layers
-                    optimizers[args.model_name] = update_optimizer(
-                        optimizers[args.model_name], models[args.model_name], layers_to_not_freeze
-                    )
-                    layers_frozen=True
+                            param_group['lr'] = 0.0
+                layers_frozen=True
 
             loss,  golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
