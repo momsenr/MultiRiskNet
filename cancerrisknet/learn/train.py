@@ -67,9 +67,9 @@ def train_model(train_data, dev_data, model, args):
             
                     # Update the optimizer to exclude the frozen layers
                     optimizers[args.model_name] = update_optimizer(
-                    optimizers[args.model_name], models[args.model_name], layers_to_not_freeze
-                )
-                layers_frozen=True
+                        optimizers[args.model_name], models[args.model_name], layers_to_not_freeze
+                    )
+                    layers_frozen=True
 
             loss,  golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
