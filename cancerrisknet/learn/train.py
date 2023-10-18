@@ -45,6 +45,8 @@ def train_model(train_data, dev_data, model, args):
     for epoch in range(start_epoch, args.epochs + 1):
 
         print("-------------\nEpoch {}:".format(epoch))
+        if(args.freeze_all_but_last_layer=='after_number_of_epochs' and epoch==args.freeze_all_but_last_layer_after_epoch):
+            train_only_last_layers = True
 
         for mode, data_loader in [('Train', train_data_loader), ('Dev', dev_data_loader)]:
             if_train = mode == 'Train'
@@ -100,7 +102,8 @@ def train_model(train_data, dev_data, model, args):
         if num_epoch_sans_improvement >= args.patience:
             print("Reducing learning rate")
             num_epoch_sans_improvement = 0
-            train_only_last_layers = True
+            if(args.freeze_all_but_last_layer=='when_reducing_lr'):
+                train_only_last_layers = True
 
             models, optimizer_states, _, _, _ = state_keeper.load()
             # Reset optimizers
