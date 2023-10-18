@@ -10,6 +10,13 @@ from cancerrisknet.utils.time_logger import TimeLogger
 import warnings
 tqdm.monitor_interval = 0
 
+def update_optimizer(optimizer, model, layers_to_not_freeze):
+    new_params = [
+        param for name, param in model.named_parameters() if name in layers_to_not_freeze or param.requires_grad
+    ]
+    optimizer.param_groups[0]['params'] = new_params
+    return optimizer
+
 def train_model(train_data, dev_data, model, args):
     """
         Train model and tune on dev set using args.tuning_metric. If model doesn't improve dev performance within
@@ -31,6 +38,10 @@ def train_model(train_data, dev_data, model, args):
     dev_data_loader = get_dataset_loader(args, dev_data)
     logger_epoch.log("Get train and dev dataset loaders")
 
+    train_only_last_layers=False
+    layers_frozen=False
+    
+
     for epoch in range(start_epoch, args.epochs + 1):
 
         print("-------------\nEpoch {}:".format(epoch))
@@ -38,6 +49,26 @@ def train_model(train_data, dev_data, model, args):
         for mode, data_loader in [('Train', train_data_loader), ('Dev', dev_data_loader)]:
             if_train = mode == 'Train'
             key_prefix = mode.lower()
+
+            if(train_only_last_layers and not layers_frozen):
+                    logger_epoch.log("Freezing all but last layers")
+                    layers_to_not_freeze = [
+                        'prob_of_failure_layer.hazard_fcs.weight', 
+                        'prob_of_failure_layer.hazard_fcs.bias',
+                        'prob_of_failure_layer.base_hazard_fcs.weight', 
+                        'prob_of_failure_layer.base_hazard_fcs.bias'
+                    ]
+
+                    for name, param in model.named_parameters():
+                        if name not in layers_to_not_freeze:
+                            param.requires_grad = False
+            
+                    # Update the optimizer to exclude the frozen layers
+                    optimizers[args.model_name] = update_optimizer(
+                    optimizers[args.model_name], models[args.model_name], layers_to_not_freeze
+                )
+                layers_frozen=True
+
             loss,  golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
                           optimizers=optimizers, args=args)
@@ -69,6 +100,7 @@ def train_model(train_data, dev_data, model, args):
         if num_epoch_sans_improvement >= args.patience:
             print("Reducing learning rate")
             num_epoch_sans_improvement = 0
+            train_only_last_layers = True
 
             models, optimizer_states, _, _, _ = state_keeper.load()
             # Reset optimizers
@@ -92,7 +124,7 @@ def train_model(train_data, dev_data, model, args):
 
     return epoch_stats, models
 
-def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args, train_last_layer_only=False):
+def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
     """
         Run model for one pass of data_loader, and return epoch statistics.
         Args:
@@ -103,8 +135,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args, trai
                             necessarily spaning through the entire dataset.
             optimizers: dict of optimizers, one for each model
             args: general runtime args defined in by argparse
-            train_last_layer_only: If True, only train the last layer of the model. Only evaluated if train=True.
-
 
         Returns:
             avg_loss: epoch loss
@@ -164,25 +194,8 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args, trai
 
         logger.log("model step")
         if train:
-            if not train_last_layer_only:
-                optimizers[args.model_name].step()
-                optimizers[args.model_name].zero_grad()
-            else: 
-                # Freeze all layers except the last one
-                for name, param in model.named_parameters():
-                    if name != 'prob_of_failure_layer.weight' and name != 'prob_of_failure_layer.bias':
-                        param.requires_grad = False  
-                #print all layers that are frozen
-                for name, param in model.named_parameters():
-                    if param.requires_grad == False:
-                        print(name)
-                
-                optimizers[args.model_name].step()
-                optimizers[args.model_name].zero_grad()
-                # Unfreeze all layers
-                for name, param in model.named_parameters():
-                    param.requires_grad = True
-
+            optimizers[args.model_name].step()
+            optimizers[args.model_name].zero_grad()
 
         logger.log("model update")
         with torch.no_grad():
