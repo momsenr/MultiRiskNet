@@ -99,7 +99,13 @@ class DiseaseProgressionDataset(data.Dataset):
 
         if self.split_group in ['dev', 'test', 'attribute']:
             if not self.args.no_random_sample_eval_trajectories:
+                now=datetime.now()
                 selected_idx = [random.choice(valid_indices) for _ in range(self.args.max_eval_indices)]
+                print('Time needed for random.choice sampling: ', datetime.now()-now, str(selected_idx)) 
+                now=datetime.now()
+                selected_idx = random.sample(valid_indices, min(len(valid_indices), self.args.max_eval_indices))
+                print('Time needed for random.sample sampling: ', datetime.now()-now,str(selected_idx))
+                exi
             else:
                 selected_idx = valid_indices[-self.args.max_eval_indices:]
 
