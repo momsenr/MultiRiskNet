@@ -150,7 +150,7 @@ def parse_args(args_str=None):
     
     if args.test or args.dev:
         if not any([True for argument, values in args.__dict__.items() for metric in argument.split('_')[-1:]
-                    if metric in args.tuning_metric and values]) and args.tuning_metric is not 'loss':
+                    if metric in args.tuning_metric and values]) and args.tuning_metric != 'loss':
             raise Exception("[E] Tuning metric {} is not computed in Eval metric! Aborting.".format(args.tuning_metric))
 
         assert any([args.eval_auroc, args.eval_auprc, args.eval_mcc, args.eval_c_index]),\
