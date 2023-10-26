@@ -29,7 +29,7 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
         # Compute BCE loss for all tasks
         losses = F.binary_cross_entropy_with_logits(logits, y_seq, weight=y_mask, reduction='none')
 
-        if(args.focal_loss_gamma!=1)
+        if(args.focal_loss_gamma!=1):
             p = torch.sigmoid(logits)
             p_t = p * y_seq + (1 - p) * (1 - y_seq)
             losses = losses * ((1 - p_t) ** args.focal_loss_gamma)
