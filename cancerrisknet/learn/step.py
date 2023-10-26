@@ -28,6 +28,12 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
     if args.loss_fn == 'binary_cross_entropy_with_logits':
         # Compute BCE loss for all tasks
         losses = F.binary_cross_entropy_with_logits(logits, y_seq, weight=y_mask, reduction='none')
+
+        if(args.focal_loss_gamma!=1):
+            p = torch.sigmoid(logits)
+            p_t = p * y_seq + (1 - p) * (1 - y_seq)
+            losses = losses * ((1 - p_t) ** args.focal_loss_gamma)
+
         # Sum over the sequence dimension and then divide by the sum of the masks for each task
         losses = torch.sum(losses, dim=(0,2)) / torch.sum(y_mask, dim=(0,2))
     elif args.loss_fn == 'mse':
@@ -38,6 +44,7 @@ def get_multi_task_loss(logits, batch, args, task_weights=None):
 
     # Weighted sum of all task losses
     return torch.sum(task_weights * losses)/torch.sum(task_weights)
+
 
 def model_step(batch, models, train_model, args, task_weights=None):
     """
