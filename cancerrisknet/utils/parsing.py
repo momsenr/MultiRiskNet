@@ -83,7 +83,7 @@ def parse_args(args_str=None):
     # Learning Hyper-params
     parser.add_argument('--loss_fn', type=str, default="binary_cross_entropy_with_logits",
                         help='loss function to use, available: [Xent (default), MSE]')
-    parser.add_argument('--focal_loss_gamma', type=float, default=1, help='Gamma parameter for focal loss. [default: 1]')
+    parser.add_argument('--focal_loss_gamma', type=float, default=0, help='Gamma parameter for focal loss. [default: 0]')
     parser.add_argument('--optimizer', type=str, default="adam", help='The optimizer to use during training. '
                                                                       'Choose from [default: adam, adagrad, sgd]')
     parser.add_argument('--train_batch_size', type=int, default=64, help="Batch size used when training the model.")
