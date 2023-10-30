@@ -70,6 +70,8 @@ def train_model(train_data, dev_data, model, args):
                                                                  epoch_stats, key_prefix)
             logger_epoch.log("Compute eval metrics ({})".format(key_prefix))
             print(log_statement)
+            if args.use_uncertainty_loss_weights:
+                print('uncertainty weights:', models[args.model_name].log_vars)
 
         # Save model if beats best dev (min loss or max c-index_{i,a})
         best_func, arg_best = (min, np.argmin) if 'loss' in tuning_key else (max, np.argmax)
@@ -94,12 +96,15 @@ def train_model(train_data, dev_data, model, args):
             if(args.freeze_all_but_last_layer=='when_reducing_lr'):
                 train_only_last_layers = True
 
-            models, optimizer_states, _, _, _ = state_keeper.load()
+            model_states, optimizer_states, _, _, _ = state_keeper.load()
+            for name in models:
+                model_state_dict = model_states[name]
+                models[name].load_state_dict(model_state_dict)
             # Reset optimizers
             for name in optimizers:
                 optimizer = optimizers[name]
-                state_dict = optimizer_states[name]
-                optimizers[name] = state_keeper.load_optimizer(optimizer, state_dict)
+                optimizer_state_dict = optimizer_states[name]
+                optimizers[name].load_state_dict(optimizer_state_dict)
             # Reduce LR
             for name in optimizers:
                 optimizer = optimizers[name]

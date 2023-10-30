@@ -60,7 +60,7 @@ class StateKeeper:
             model = models[model_name]
             model_path = os.path.join(self.args.model_dir, MODEL_PATH.format(model_name, identifier))
 
-            torch.save(model, model_path)
+            torch.save(model.state_dict(), model_path)
             # save optimizer
             optimizer = optimizers[model_name]
             optimizer_path = os.path.join(self.args.model_dir, OPTIMIZER_PATH.format(model_name, identifier))
@@ -100,7 +100,7 @@ class StateKeeper:
             print(e.message)
 
         # Load model and corresponding optimizers.
-        models = {}
+        model_states = {}
         optimizer_states = {}
         model_names = [self.model_name]
 
@@ -108,7 +108,7 @@ class StateKeeper:
             # Load model
             model_path = os.path.join(self.args.model_dir, MODEL_PATH.format(model_name, identifier))
             try:
-                models[model_name] = torch.load(model_path, map_location=self.args.device)
+                model_states[model_name] = torch.load(model_path, map_location=self.args.device)
             except Exception:
                 raise Exception(
                     ERROR_MSG.format(model_path))
@@ -120,38 +120,7 @@ class StateKeeper:
             except Exception:
                 raise Exception(
                     ERROR_MSG.format(optimizer_path))
+            
 
-        return models, optimizer_states, param_dict['epoch'], param_dict['lr'], epoch_stats
+        return model_states, optimizer_states, param_dict['epoch'], param_dict['lr'], epoch_stats
 
-    def load_optimizer(self, optimizer, state_dict):
-        """
-            Given an optimizer and a state_dict, loads the state_dict into
-            the optimizer while preserving correct device placement.
-
-            Returns:
-                optimizer, with new state_dict
-
-        """
-        # Build mapping from param to device
-        param_to_device = {}
-        for param_key in state_dict['state']:
-            param = state_dict['state'][param_key]
-            for attribute_key in param:
-                if isinstance(param[attribute_key], int) or isinstance(param[attribute_key], float):
-                    continue
-                param_to_device["{}_{}".format(param_key, attribute_key)] = param[attribute_key].get_device()
-
-        optimizer.load_state_dict(state_dict)
-        if self.args.cuda:
-            # Move params to correct gpus. Load_state_dict uses copy.deepcopy which loses device information
-            for param_key in optimizer.state_dict()['state']:
-                param = optimizer.state_dict()['state'][param_key]
-                for attribute_key in param:
-                    if isinstance(param[attribute_key], int) or isinstance(param[attribute_key], float):
-                        continue
-                    optimizer.state_dict()['state'][param_key][attribute_key] = \
-                        optimizer.state_dict()['state'][param_key][attribute_key].cuda(
-                            param_to_device["{}_{}".format(param_key, attribute_key)]
-                        )
-
-        return optimizer
