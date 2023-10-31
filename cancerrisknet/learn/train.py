@@ -117,7 +117,10 @@ def train_model(train_data, dev_data, model, args):
             logger_epoch.update()
 
     # Restore model to best dev performance, or last epoch when not tuning on dev
-    models, _, _, _, _ = state_keeper.load()
+    model_states, _, _, _, _ = state_keeper.load()
+    for name in models:
+        model_state_dict = model_states[name]
+        models[name].load_state_dict(model_state_dict)
 
     return epoch_stats, models
 
