@@ -32,6 +32,10 @@ class AbstractRiskModel(nn.Module):
             else args.hidden_dim
         self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
 
+        if args.use_uncertainty_loss_weights:
+            self.log_vars = nn.Parameter(torch.zeros(args.num_tasks))
+
+
         if args.use_time_embed:
             if args.model_name != 'transformer':
                 warnings.warn("[W] Time embedding here is designed for transformer only. "

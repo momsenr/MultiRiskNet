@@ -41,10 +41,11 @@ def get_model_by_name(name, args):
 
 def load_model(path, args):
     print('\nLoading model from [%s]...' % path)
+    model = get_model(args)
+    model_names = [args.model_name]
 
-    model = torch.load(path)
-    if isinstance(model, dict):
-        model = model[args.model_name]
+    model_state_dict = torch.load(path, map_location=args.device)
+    model.load_state_dict(model_state_dict)
 
     if isinstance(model, nn.DataParallel):
         model = model.module.cpu()
