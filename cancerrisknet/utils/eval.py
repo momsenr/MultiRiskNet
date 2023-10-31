@@ -51,6 +51,7 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
     weighed_sum_auroc=0
     weighed_sum_mcc=0
 
+
     for index, time in enumerate(args.month_endpoints):
         probs_for_eval, golds_for_eval = get_probs_golds(preds_dict, index=index)
 
@@ -165,6 +166,8 @@ def compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs, pids
             sum_mcc+=stats_dict[key][-1]
             weighed_sum_mcc+=stats_dict[weighed_key][-1]
     
+    stats_dict['{}_loss'.format(key_prefix)].append(loss)
+
     if args.eval_auroc:
         key_name_auroc_sum = '{}_all_tasks_sum_auroc'.format(key_prefix)
         key_name_weighed_sum_auroc = '{}_all_tasks_weighed_sum_auroc'.format(key_prefix)
