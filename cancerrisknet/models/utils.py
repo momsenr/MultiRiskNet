@@ -87,7 +87,7 @@ class MultiTaskCumulativeProbabilityLayer(nn.Module):
         # Adjusted mask for multiple tasks
         mask = torch.ones([max_followup, max_followup])
         mask = torch.triu(mask, diagonal=0)
-        mask = torch.nn.Parameter(mask.unsqueeze(0).expand(self.args.num_tasks, -1, -1), requires_grad=False)
+        mask = torch.nn.Parameter(mask.unsqueeze(0).repeat(self.args.num_tasks, 1, 1), requires_grad=False)
         self.register_parameter('upper_triagular_mask', mask)
 
     def hazards(self, x):
