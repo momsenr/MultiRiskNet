@@ -1,52 +1,52 @@
 import torch
 import torch.nn.functional as F
 
-def get_multi_task_loss(logits, batch, args, task_weights=None):
+def get_multi_task_loss(logits, batch, args, log_vars=None):
     """
-    Compute multi-task loss.
+    Compute multi-task loss with uncertainty.
 
     Args:
         logits (torch.Tensor): Predicted logits for all tasks. Shape: [num_tasks, *]
         batch (dict): Batch containing labels and masks for all tasks.
         args: Arguments containing loss function choice.
-        task_weights (list or torch.Tensor, optional): Weights for each task. If not provided,
-                                                       all tasks are treated equally.
+        log_vars (torch.Tensor): Logarithm of the uncertainty for each task.
 
     Returns:
         torch.Tensor: Total multi-task loss.
     """
-
     y_seq = batch['y_seq']
     y_mask = batch['y_mask']
-
-    # If no specific task weights are provided, assume equal weights for all tasks.
-    if task_weights is None:
-        task_weights = torch.ones(logits.shape[1]).to(logits.device)
-    else:
-        task_weights = torch.tensor(task_weights).to(logits.device)
 
     if args.loss_fn == 'binary_cross_entropy_with_logits':
         # Compute BCE loss for all tasks
         losses = F.binary_cross_entropy_with_logits(logits, y_seq, weight=y_mask, reduction='none')
-
-        if(args.focal_loss_gamma!=0):
+        
+        if args.focal_loss_gamma != 0:
             p = torch.sigmoid(logits)
             p_t = p * y_seq + (1 - p) * (1 - y_seq)
             losses = losses * ((1 - p_t) ** args.focal_loss_gamma)
 
         # Sum over the sequence dimension and then divide by the sum of the masks for each task
         losses = torch.sum(losses, dim=(0,2)) / torch.sum(y_mask, dim=(0,2))
+
     elif args.loss_fn == 'mse':
         # Compute MSE loss for all tasks, adjust to sum the losses and then average over tasks
         losses = F.mse_loss(logits, y_seq, reduction='sum').div(logits.shape[1])
     else:
         raise Exception('Loss function is illegal or not found.')
 
-    # Weighted sum of all task losses
-    return torch.sum(task_weights * losses)/torch.sum(task_weights)
+    if log_vars is not None:
+        # Apply task precision and log_vars as regularization term
+        #losses = 0.5 * (eta ** 2) * losses + log_vars
+        losses = torch.exp(-log_vars).to(logits.device) * losses + log_vars
+        final_loss= torch.sum(losses)
+    else:
+        final_loss = torch.sum(losses)/args.num_tasks
+    
+    return final_loss
 
 
-def model_step(batch, models, train_model, args, task_weights=None):
+def model_step(batch, models, train_model, args):
     """
     Single step of running model on a batch x,y for multi-task learning and computing the loss.
     Returns various stats of this single forward and backward pass.
@@ -68,7 +68,10 @@ def model_step(batch, models, train_model, args, task_weights=None):
         dates: the admission date as a tensor
     """
     logits = models[args.model_name](batch['x'], batch)
-    loss = get_multi_task_loss(logits, batch, args,task_weights=task_weights)
+    if args.use_uncertainty_loss_weights:
+        loss = get_multi_task_loss(logits, batch, args, log_vars=models[args.model_name].log_vars)
+    else:
+        loss = get_multi_task_loss(logits, batch, args)
 
     if train_model:
         loss.backward()
