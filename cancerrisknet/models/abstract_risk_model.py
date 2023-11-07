@@ -28,11 +28,19 @@ class AbstractRiskModel(nn.Module):
 
         self.pool = get_pool(args.pool_name)(args)
         self.dropout = nn.Dropout(p=args.dropout)
-        hidden_dim = args.hidden_dim + 1 if self.args.add_age_neuron else args.hidden_dim
-        self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
 
+        if(args.model_name == 'transformer_softsharing'):
+            hidden_dim = 2 * args.hidden_dim + 1 if self.args.add_age_neuron else 2*args.hidden_dim
+        else:
+            hidden_dim = args.hidden_dim + 1 if self.args.add_age_neuron else args.hidden_dim
+        
+        #For transformer_softsharing: At a later stage, we could add a flag to choose if we want to independent or one shared layers (for the two tasks).
+        #In the first case, we really force the two transformers to learn one task each. In this current implementation we just have two different
+        #transformers, which could learn anything (but not necessarily one task each).
+        self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
+            
         if args.use_uncertainty_loss_weights:
-            self.log_vars = nn.Parameter(torch.zeros(args.num_tasks))
+            self.log_vars = nn.Parameter(torch.full((args.num_tasks,), -1 / args.num_tasks, device='cuda'))
 
 
         if args.use_time_embed:
@@ -70,6 +78,7 @@ class AbstractRiskModel(nn.Module):
             embed_x = self.condition_on_pos_embed(embed_x, age, 'age')
 
         seq_hidden = self.encode_trajectory(embed_x, batch)
+        print(seq_hidden.shape)
         seq_hidden = seq_hidden.transpose(1, 2)
         hidden = self.dropout(self.pool(seq_hidden))
         if self.args.add_age_neuron:
@@ -77,4 +86,5 @@ class AbstractRiskModel(nn.Module):
             age_in_year = age_in_year.unsqueeze(1)  # This makes age_in_year's shape [B, 1]
             hidden = torch.cat((hidden, age_in_year), dim=1)  # Concatenate along the second dimension (feature dimension)
         logit = self.prob_of_failure_layer(hidden)
+
         return logit

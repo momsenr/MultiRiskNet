@@ -83,6 +83,7 @@ def parse_args(args_str=None):
     # Learning Hyper-params
     parser.add_argument('--loss_fn', type=str, default="binary_cross_entropy_with_logits",
                         help='loss function to use, available: [Xent (default), MSE]')
+    parser.add_argument('--soft_sharing_lambda', type=float, default=0.00001, help="lambda for soft parameter sharing.")
     parser.add_argument('--focal_loss_gamma', type=float, default=0, help='Gamma parameter for focal loss. [default: 0]')
     parser.add_argument('--optimizer', type=str, default="adam", help='The optimizer to use during training. '
                                                                       'Choose from [default: adam, adagrad, sgd]')
@@ -179,7 +180,7 @@ def parse_args(args_str=None):
                         '--dataset', '--num_workers',
                         '--eval_batch_size', '--max_batches_per_dev_epoch', 
                         '--resume_from_result']
-        keep_args_from_config = ['train', 'dev', 'test', 'attribute','metadata_path', 'save_dir', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'jeresults_path', 'exp_id']
+        keep_args_from_config = ['train', 'dev', 'tuning_metric', 'test', 'attribute','metadata_path', 'save_dir', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'jeresults_path', 'exp_id']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
                 keep_args_from_config.append(a.replace('--',''))
