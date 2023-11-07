@@ -28,8 +28,7 @@ class AbstractRiskModel(nn.Module):
 
         self.pool = get_pool(args.pool_name)(args)
         self.dropout = nn.Dropout(p=args.dropout)
-        hidden_dim = args.hidden_dim + 1 if self.args.add_age_neuron and self.args.model_name == 'bow' \
-            else args.hidden_dim
+        hidden_dim = args.hidden_dim + 1 if self.args.add_age_neuron else args.hidden_dim
         self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
 
         if args.use_uncertainty_loss_weights:
@@ -75,7 +74,7 @@ class AbstractRiskModel(nn.Module):
         hidden = self.dropout(self.pool(seq_hidden))
         if self.args.add_age_neuron:
             age_in_year = batch['age']/365.
-            hidden = torch.cat((hidden, age_in_year), axis=-1)
+            age_in_year = age_in_year.unsqueeze(1)  # This makes age_in_year's shape [B, 1]
+            hidden = torch.cat((hidden, age_in_year), dim=1)  # Concatenate along the second dimension (feature dimension)
         logit = self.prob_of_failure_layer(hidden)
-
         return logit
