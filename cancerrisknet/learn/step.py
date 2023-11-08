@@ -74,7 +74,6 @@ def model_step(batch, models, train_model, args):
         loss = get_multi_task_loss(logits, batch, args)
 
     if(args.model_name == 'transformer_softsharing'):
-        print('soft sharing loss', models[args.model_name].soft_sharing_loss())
         loss += models[args.model_name].soft_sharing_loss()
 
     if train_model:

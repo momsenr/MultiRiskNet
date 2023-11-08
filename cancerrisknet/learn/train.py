@@ -72,6 +72,8 @@ def train_model(train_data, dev_data, model, args):
             print(log_statement)
             if args.use_uncertainty_loss_weights:
                 print('uncertainty weights:', models[args.model_name].log_vars)
+            if(args.model_name == 'transformer_softsharing'):
+                print('soft sharing loss', models[args.model_name].soft_sharing_loss())
 
         # Save model if beats best dev (min loss or max c-index_{i,a})
         best_func, arg_best = (min, np.argmin) if 'loss' in tuning_key else (max, np.argmax)
