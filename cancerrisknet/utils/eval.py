@@ -60,24 +60,27 @@ def compute_eval_metrics(args, loss, golds, patient_golds, probs, pids, dates, c
             auc = compute_auroc(golds_for_eval, probs_for_eval)
             log_statement += " -{}: {} (n={} , c={} )".format(key_name, auc, len(golds_for_eval), sum(golds_for_eval))
             stats_dict[key_name].append(auc)
-            sum_auroc+=auc
-            weighed_sum_auroc+=auc*(sum(golds_for_eval)/len(golds_for_eval))
+            if(auc!='NA'):
+                sum_auroc+=auc
+                weighed_sum_auroc+=auc*(sum(golds_for_eval)/len(golds_for_eval))
 
         if args.eval_auprc:
             key_name = '{}_{}month_auprc'.format(key_prefix, time)
             auc = compute_auprc(golds_for_eval, probs_for_eval)
             log_statement += " -{}: {} (n={} , c={} )".format(key_name, auc, len(golds_for_eval), sum(golds_for_eval))    
             stats_dict[key_name].append(auc)
-            sum_auprc+=auc
-            weighed_sum_auprc+=auc*(sum(golds_for_eval)/len(golds_for_eval))
+            if(auc!='NA'):
+                sum_auprc+=auc
+                weighed_sum_auprc+=auc*(sum(golds_for_eval)/len(golds_for_eval))
 
         if args.eval_mcc:
             key_name = '{}_{}month_mcc'.format(key_prefix, time)
             mcc = compute_mcc(golds_for_eval, probs_for_eval)
             log_statement += " -{}: {} (n={} , c={} )".format(key_name, mcc, len(golds_for_eval), sum(golds_for_eval))
             stats_dict[key_name].append(mcc)
-            sum_mcc+=mcc
-            weighed_sum_mcc+=mcc*(sum(golds_for_eval)/len(golds_for_eval))
+            if(auc!='NA'):
+                sum_mcc+=mcc
+                weighed_sum_mcc+=mcc*(sum(golds_for_eval)/len(golds_for_eval))
 
     if args.eval_auroc:
         key_name_auroc_sum = '{}_sum_auroc'.format(key_prefix)
