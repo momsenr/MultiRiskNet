@@ -84,6 +84,8 @@ def parse_args(args_str=None):
     parser.add_argument('--loss_fn', type=str, default="binary_cross_entropy_with_logits",
                         help='loss function to use, available: [Xent (default), MSE]')
     parser.add_argument('--soft_sharing_lambda', type=float, default=0.00001, help="lambda for soft parameter sharing.")
+    parser.add_argument('--transformer_forced_on_task', action='store_true', default=False,
+                        help='Whether or not to force each transformer to correspond to one task. Only relevant if model_name is transformer_softsharing.')
     parser.add_argument('--focal_loss_gamma', type=float, default=0, help='Gamma parameter for focal loss. [default: 0]')
     parser.add_argument('--optimizer', type=str, default="adam", help='The optimizer to use during training. '
                                                                       'Choose from [default: adam, adagrad, sgd]')
@@ -104,7 +106,7 @@ def parse_args(args_str=None):
     parser.add_argument('--use_uncertainty_loss_weights', action='store_true', default=False)
     parser.add_argument('--lr_decay', type=float, default=1., help='Decay of learning rate [default: no decay (1.)]')
     parser.add_argument('--momentum', type=float, default=0, help='Momentum to use with SGD')
-    parser.add_argument('--weight_decay', type=float, default=0, help='L2 Regularization penaty [default: 0]')
+    parser.add_argument('--weight_decay', type=float, default=0, help='L2 Regularization penalty [default: 0]')
     parser.add_argument('--patience', type=int, default=5,
                         help='Number of epochs without improvement on dev before reducing learning rate. [default: 5]')
     parser.add_argument('--freeze_all_but_last_layer_after_epoch', type=int, default=20,

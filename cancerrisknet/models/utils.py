@@ -16,7 +16,7 @@ class CumulativeProbabilityLayer(nn.Module):
             self.monotonicity_activation = nn.ReLU(inplace=True)
         mask = torch.ones([max_followup, max_followup])
         mask = torch.triu(mask, diagonal=0)
-        self.register_parameter('upper_triagular_mask', mask)
+        self.register_buffer('upper_triangular_mask', mask)
 
     def hazards(self, x):
         raw_hazard = self.hazard_fc(x)
@@ -27,7 +27,7 @@ class CumulativeProbabilityLayer(nn.Module):
         hazards = self.hazards(x)
         B, T = hazards.size()  # hazards is (B, T)
         expanded_hazards = hazards.unsqueeze(-1).expand(B, T, T)  # expanded_hazards is (B,T, T)
-        masked_hazards = expanded_hazards * self.upper_triagular_mask  # masked_hazards now (B,T, T)
+        masked_hazards = expanded_hazards * self.upper_triangular_mask  # masked_hazards now (B,T, T)
         cum_prob = torch.sum(masked_hazards, dim=1) + self.base_hazard_fc(x)
         return cum_prob
 
@@ -86,9 +86,8 @@ class MultiTaskCumulativeProbabilityLayer(nn.Module):
 
         # Adjusted mask for multiple tasks
         mask = torch.ones([max_followup, max_followup])
-        mask = torch.triu(mask, diagonal=0)
-        mask = torch.nn.Parameter(mask.unsqueeze(0).repeat(self.args.num_tasks, 1, 1), requires_grad=False)
-        self.register_parameter('upper_triagular_mask', mask)
+        mask = torch.triu(mask, diagonal=0).unsqueeze(0).repeat(self.args.num_tasks, 1, 1)
+        self.register_buffer('upper_triangular_mask', mask)
 
     def hazards(self, x):
         raw_hazard = self.hazard_fcs(x)
@@ -102,7 +101,7 @@ class MultiTaskCumulativeProbabilityLayer(nn.Module):
 
         # Vectorized computation of expanded hazards
         expanded_hazards = hazards_output.unsqueeze(-1).expand(B, self.args.num_tasks, T, T)
-        masked_hazards = expanded_hazards * self.upper_triagular_mask
+        masked_hazards = expanded_hazards * self.upper_triangular_mask
 
         cum_prob = torch.sum(masked_hazards, dim=2) + self.base_hazard_fcs(x).view(B, self.args.num_tasks, 1)
 
