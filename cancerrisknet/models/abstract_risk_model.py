@@ -37,7 +37,13 @@ class AbstractRiskModel(nn.Module):
         #For transformer_softsharing: At a later stage, we could add a flag to choose if we want to independent or one shared layers (for the two tasks).
         #In the first case, we really force the two transformers to learn one task each. In this current implementation we just have two different
         #transformers, which could learn anything (but not necessarily one task each).
-        self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
+        flag=False
+        if(flag):
+            #change hidden_dim
+            self.prob_of_failure_layer_pancreatic = CumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
+            self.prob_of_failure_layer_ovarian = CumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
+        else:
+            self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
             
         if args.use_uncertainty_loss_weights:
             self.log_vars = nn.Parameter(torch.full((args.num_tasks,), -1 / args.num_tasks, device='cuda'))
@@ -77,10 +83,19 @@ class AbstractRiskModel(nn.Module):
             age = batch['age_seq'].float()
             embed_x = self.condition_on_pos_embed(embed_x, age, 'age')
 
-        seq_hidden = self.encode_trajectory(embed_x, batch)
-        print(seq_hidden.shape)
-        seq_hidden = seq_hidden.transpose(1, 2)
-        hidden = self.dropout(self.pool(seq_hidden))
+        if(self.args.model_name == 'transformer_softsharing'):
+            #todo: can this be parallelied?
+            seq_hidden1,seq_hidden2 = self.encode_trajectory(embed_x, batch)
+            seq_hidden1 = seq_hidden1.transpose(1, 2)
+            seq_hidden2 = seq_hidden2.transpose(1, 2)
+            hidden1 = self.dropout(self.pool(seq_hidden1))
+            hidden2 = self.dropout(self.pool(seq_hidden2))
+            hidden= torch.cat((hidden1,hidden2 ), dim=1)
+        else:
+            seq_hidden = self.encode_trajectory(embed_x, batch)
+            seq_hidden = seq_hidden.transpose(1, 2)
+            hidden = self.dropout(self.pool(seq_hidden))
+
         if self.args.add_age_neuron:
             age_in_year = batch['age']/365.
             age_in_year = age_in_year.unsqueeze(1)  # This makes age_in_year's shape [B, 1]
