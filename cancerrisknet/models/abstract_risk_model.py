@@ -37,13 +37,13 @@ class AbstractRiskModel(nn.Module):
         #For transformer_softsharing: At a later stage, we could add a flag to choose if we want to independent or one shared layers (for the two tasks).
         #In the first case, we really force the two transformers to learn one task each. In this current implementation we just have two different
         #transformers, which could learn anything (but not necessarily one task each).
-        if(args.transformer_forced_on_task):
+        if(self.args.model_name == 'transformer_softsharing' and args.transformer_forced_on_task):
             self.prob_of_failure_layer_pancreatic = CumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
             self.prob_of_failure_layer_ovarian = CumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
         else:
             self.prob_of_failure_layer = MultiTaskCumulativeProbabilityLayer(hidden_dim, len(args.month_endpoints), args)
             
-        if args.use_uncertainty_loss_weights:
+        if args.loss_weights=='uncertainty':
             self.log_vars = nn.Parameter(torch.full((args.num_tasks,), -1 / args.num_tasks, device='cuda'))
 
 
@@ -104,7 +104,7 @@ class AbstractRiskModel(nn.Module):
                 hidden1 = torch.cat((hidden1, age_in_year), dim=1)
                 hidden2 = torch.cat((hidden2, age_in_year), dim=1) 
         
-        if(self.args.transformer_forced_on_task==False):
+        if(self.args.model_name != 'transformer_softsharing' or self.args.transformer_forced_on_task==False ):
             logit = self.prob_of_failure_layer(hidden)
         else:
             logit1 = self.prob_of_failure_layer_pancreatic(hidden1)

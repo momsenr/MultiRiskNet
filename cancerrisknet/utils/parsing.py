@@ -83,6 +83,8 @@ def parse_args(args_str=None):
     # Learning Hyper-params
     parser.add_argument('--loss_fn', type=str, default="binary_cross_entropy_with_logits",
                         help='loss function to use, available: [Xent (default), MSE]')
+    parser.add_argument('--loss_weights', type=str, default="equal",
+                        help='loss weights to use, available: [equal (default), smart, uncertainty]')
     parser.add_argument('--soft_sharing_lambda', type=float, default=0.00001, help="lambda for soft parameter sharing.")
     parser.add_argument('--transformer_forced_on_task', action='store_true', default=False,
                         help='Whether or not to force each transformer to correspond to one task. Only relevant if model_name is transformer_softsharing.')
@@ -103,7 +105,6 @@ def parse_args(args_str=None):
                              'dataloader. Useful when the whole data is too large. Default: False.')
     parser.add_argument('--enforce_strict_monotonicity', action='store_true', default=False)
     parser.add_argument('--init_lr', type=float, default=0.001, help='The initial learning rate [default: 0.001]')
-    parser.add_argument('--use_uncertainty_loss_weights', action='store_true', default=False)
     parser.add_argument('--lr_decay', type=float, default=1., help='Decay of learning rate [default: no decay (1.)]')
     parser.add_argument('--momentum', type=float, default=0, help='Momentum to use with SGD')
     parser.add_argument('--weight_decay', type=float, default=0, help='L2 Regularization penalty [default: 0]')

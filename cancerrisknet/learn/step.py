@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def get_multi_task_loss(logits, batch, args, log_vars=None):
+def get_multi_task_loss(logits, batch, args, log_vars=None,smart=False,smart_verbose=False):
     """
     Compute multi-task loss with uncertainty.
 
@@ -36,17 +36,19 @@ def get_multi_task_loss(logits, batch, args, log_vars=None):
         raise Exception('Loss function is illegal or not found.')
 
     if log_vars is not None:
-        # Apply task precision and log_vars as regularization term
-        #losses = 0.5 * (eta ** 2) * losses + log_vars
         losses = torch.exp(-log_vars).to(logits.device) * losses + log_vars
         final_loss= torch.sum(losses)
+    if(smart==True):
+        final_loss = torch.max(losses)
+        if(smart_verbose==True):
+            print("losses:",losses)
     else:
         final_loss = torch.sum(losses)/args.num_tasks
     
     return final_loss
 
 
-def model_step(batch, models, train_model, args):
+def model_step(batch, models, train_model, args,smart_loss=False,smart_verbose=False):
     """
     Single step of running model on a batch x,y for multi-task learning and computing the loss.
     Returns various stats of this single forward and backward pass.
@@ -68,8 +70,10 @@ def model_step(batch, models, train_model, args):
         dates: the admission date as a tensor
     """
     logits = models[args.model_name](batch['x'], batch)
-    if args.use_uncertainty_loss_weights:
+    if args.loss_weights=='uncertainty':
         loss = get_multi_task_loss(logits, batch, args, log_vars=models[args.model_name].log_vars)
+    elif args.loss_weights=='smart' and smart_loss==True:
+        loss = get_multi_task_loss(logits, batch, args,smart=True,smart_verbose=smart_verbose)
     else:
         loss = get_multi_task_loss(logits, batch, args)
 

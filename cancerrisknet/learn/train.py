@@ -33,11 +33,16 @@ def train_model(train_data, dev_data, model, args):
 
     train_only_last_layers=False
     layers_frozen=False
-    
+    smart_loss=False
 
     for epoch in range(start_epoch, args.epochs + 1):
 
         print("-------------\nEpoch {}:".format(epoch))
+
+        if(args.loss_weights=='smart' and epoch>args.epochs/4):
+            print("Using smart loss")
+            smart_loss=True
+                    
         if(args.freeze_all_but_last_layer=='after_number_of_epochs' and epoch==args.freeze_all_but_last_layer_after_epoch):
             train_only_last_layers = True
 
@@ -62,7 +67,7 @@ def train_model(train_data, dev_data, model, args):
 
             loss,  golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
-                          optimizers=optimizers, args=args)
+                          optimizers=optimizers, args=args, smart_loss=(smart_loss and if_train),smart_verbose=True)
             logger_epoch.log("Run epoch ({})".format(key_prefix))
 
             log_statement, epoch_stats, _ = compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs,
@@ -70,7 +75,7 @@ def train_model(train_data, dev_data, model, args):
                                                                  epoch_stats, key_prefix)
             logger_epoch.log("Compute eval metrics ({})".format(key_prefix))
             print(log_statement)
-            if args.use_uncertainty_loss_weights:
+            if args.loss_weights=='uncertainty':
                 print('uncertainty weights:', models[args.model_name].log_vars)
             if(args.model_name == 'transformer_softsharing'):
                 print('soft sharing loss', models[args.model_name].soft_sharing_loss())
@@ -126,7 +131,7 @@ def train_model(train_data, dev_data, model, args):
 
     return epoch_stats, models
 
-def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
+def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args,smart_loss=False,smart_verbose=False):
     """
         Run model for one pass of data_loader, and return epoch statistics.
         Args:
@@ -192,7 +197,7 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args):
         batch = prepare_batch(batch, args)
         logger.newline()
         logger.log("prepare data")
-        loss, batch_probs = model_step(batch, models, train, args)
+        loss, batch_probs = model_step(batch, models, train, args, smart_loss=smart_loss,smart_verbose=smart_verbose)
 
         logger.log("model step")
         if train:
