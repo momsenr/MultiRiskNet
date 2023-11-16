@@ -105,7 +105,8 @@ if __name__ == '__main__':
     if args.attribute:
         print("-------------\nAttribution")
         model_for_attribution = AttributionModel(model, args)
-        test_attribution, test_censored_attribution = attribute.compute_attribution(attribution_set, model_for_attribution, args)
+        #currently we only compute attribution for task 0
+        test_attribution, test_censored_attribution = attribute.compute_attribution(attribution_set, model_for_attribution, args, task_index=0)
         print("Save attribution results to {}".format(args.results_path))
         args_dict = vars(args).copy(); del args_dict['code_to_index_map']; pickle.dump(args_dict, open(args.results_path, 'wb'))
         logger_main.log("ATTRIBUTION")

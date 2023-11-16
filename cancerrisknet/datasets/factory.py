@@ -103,17 +103,14 @@ def get_dataset(args):
     test = dataset_class(args, 'test',args.metadata_path, preprocess_test) if args.test else []
 
     if args.attribute:
-        attr = dataset_class(metadata, args, 'test')
-        attr.split_group = "attribute"
+        attr = dataset_class(args, 'test',args.metadata_path, False)
+        attr.split_group='attr'
     else:
         attr = []
 
-    if args.train or (args.resume_from_result is not None):
-        # Build a new code to index map only during training.
-        build_code_to_index_map(args)
-        json.dump(args.code_to_index_map, open(args.results_path + '.code_map', 'w'))
-    else:
-        args.code_to_index_map = json.load(open(args.results_path + '.code_map',  'r'))
+    # Build a new code to index map (previously this was done only during training)
+    build_code_to_index_map(args)
+    json.dump(args.code_to_index_map, open(args.results_path + '.code_map', 'w'))
 
     args.index_map_length = len(args.code_to_index_map)
 
