@@ -117,6 +117,9 @@ def parse_args(args_str=None):
     parser.add_argument('--tuning_metric', type=str, default='36month_auroc',
                         help='Metric to judge dev set results. Possible options include auc, loss, accuracy and etc.')
     parser.add_argument('--epochs', type=int, default=20, help='Total number of epochs for training [default: 20].')
+    #just kept for backwards compatibility
+    parser.add_argument('--use_uncertainty_loss_weights', action='store_true', default=False,
+                        help='Kept for backwards compatibility. Use --loss_weights instead.')
 
     # evaluation
     parser.add_argument('--eval_auroc', action='store_true', default=False, help='Whether to calculate AUROC')
@@ -144,6 +147,16 @@ def parse_args(args_str=None):
     args.cuda = args.cuda and torch.cuda.is_available()
     args.device = 'cuda' if args.cuda else 'cpu'
     args.num_years = max(args.month_endpoints) / 12
+
+    if(args.use_uncertainty_loss_weights==True):
+        if(args.loss_weights=='equal'):
+            args.loss_weights='uncertainty'
+            print("WARNING: deprecated use of use_uncertainty_loss_weights detected. Use loss_weights instead. Setting loss_weights='uncertainty' to keep backwards compatibility.")
+        elif(args.loss_weights=='uncertainty'):
+            print("WARNING: deprecated use of use_uncertainty_loss_weights detected. Use loss_weights instead.")
+        elif(args.loss_weights=='smart'):
+            print("ERROR: deprecated use of use_uncertainty_loss_weights detected. Use loss_weights instead. loss_weights is set to smart, aborting...")
+            exit(-1)
 
     with open(args.cancer_code_dict_path, 'r') as file:
         data = file.read()
