@@ -195,7 +195,7 @@ def parse_args(args_str=None):
         overwrite_args = ['--exclusion_interval',
                         '--dataset', '--num_workers',
                         '--eval_batch_size', '--max_batches_per_dev_epoch', 
-                        '--resume_from_result --save_dir', '--exp_id', '--results_path']
+                        '--save_dir', '--exp_id', '--results_path', '--resume_from_result']
         keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute','metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'exp_id', 'results_path']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
@@ -206,7 +206,6 @@ def parse_args(args_str=None):
 
         resumed_args = Dict2Args(resumed_args)
         args.snapshot = state.get_model_path(resumed_args)
-        print(args.resume_from_result)
         args.device = args.device if torch.cuda.is_available() else 'cpu'
     return args
 
