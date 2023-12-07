@@ -105,12 +105,15 @@ if __name__ == '__main__':
     if args.attribute:
         print("-------------\nAttribution")
         model_for_attribution = AttributionModel(model, args)
-        #currently we only compute attribution for task 0
-        test_attribution, test_censored_attribution = attribute.compute_attribution(attribution_set, model_for_attribution, args, task_index=0)
-        print("Save attribution results to {}".format(args.results_path))
+        for task_index in range(1): #range(args.num_tasks):
+            test_attribution, test_attribution_y, test_censored_attribution = attribute.compute_attribution(attribution_set, model_for_attribution, args, task_index=task_index, \
+            only_positive=False, model_for_preds=model, attribution_method=args.attribution_method, \
+            pred_threshold=args.attribution_prediction_threshold)
+            print("Save attribution results for task {} to {}".format(task_index,args.results_path))
+
+            pickle.dump(test_attribution_y, open("{}.test_attribution_y_task{}".format(args.results_path,str(task_index)), 'wb'))
+            pickle.dump(test_attribution, open("{}.test_attribution_task{}".format(args.results_path,str(task_index)), 'wb'))
+            pickle.dump(test_censored_attribution, open("{}.test_censored_attribution_task{}".format(args.results_path,str(task_index)), 'wb'))
         args_dict = vars(args).copy(); del args_dict['code_to_index_map']; pickle.dump(args_dict, open(args.results_path, 'wb'))
         logger_main.log("ATTRIBUTION")
-
-        pickle.dump(test_attribution, open("{}.{}".format(args.results_path, "test_attribution"), 'wb'))
-        pickle.dump(test_censored_attribution, open("{}.{}".format(args.results_path, "test_censored_attribution"), 'wb'))
         logger_main.log("Dump results")

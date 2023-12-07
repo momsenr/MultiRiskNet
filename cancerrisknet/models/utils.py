@@ -59,10 +59,16 @@ class AttributionModel(nn.Module):
         else:
             self.model = model
 
-    def forward(self, x, age_seq, time_seq, batch):
-        batch['age_seq'] = age_seq
-        batch['time_seq'] = time_seq
-        y = self.model(x, batch=batch)
+    def forward(self, x, age_seq, time_seq, age, batch):
+        #Here we need to copy the batch and add the age_seq and time_seq, since this forward pass
+        #will be called several times by the LayerIntegratedGradients.attribute module with variable batch sizes.
+        #Therefore, we cannot simpy pass batch, but need to pass a copy of it.
+        batch_copy=batch.copy()
+        batch_copy['age_seq'] = age_seq
+        batch_copy['time_seq'] = time_seq
+        batch_copy['age'] = age
+
+        y = self.model(x, batch=batch_copy)
         return y
 
 class MultiTaskCumulativeProbabilityLayer(nn.Module):

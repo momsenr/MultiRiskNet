@@ -127,6 +127,11 @@ def parse_args(args_str=None):
     parser.add_argument('--eval_mcc', action='store_true', default=False, help='Whether to calculate MCC')
     parser.add_argument('--eval_c_index', action='store_true', default=False, help='Whether to calculate c-Index')
 
+    #attribution
+    parser.add_argument('--attribution_method', type=str, default='absolute', help='Attribution method to use. Choose from ["absolute","relative"]')
+    parser.add_argument('--attribution_prediction_threshold', type=float, default=0, help='Only consider predictions higher than threshold for attribution. [default: 0]')
+
+
     # Where to store stuff
     parser.add_argument('--save_dir', type=str, required=True, help='The output file location.')
     parser.add_argument('--model_dir', type=str, default="snapshots", help='The path to the library of trained models.')
@@ -141,7 +146,6 @@ def parse_args(args_str=None):
                              'required in the model library folder.')
 
     args = parser.parse_args() if args_str is None else parser.parse_args(args_str.split())
-
     # Generate a few more flags to help model construction
     args.results_path = os.path.join(args.save_dir, args.exp_id) + ".results"
     args.cuda = args.cuda and torch.cuda.is_available()
@@ -196,7 +200,9 @@ def parse_args(args_str=None):
                         '--dataset', '--num_workers',
                         '--eval_batch_size', '--max_batches_per_dev_epoch', 
                         '--save_dir', '--exp_id', '--results_path', '--resume_from_result']
-        keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute','metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'exp_id', 'results_path']
+        keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute', \
+        'metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', \
+        'exp_id', 'results_path', 'attribution_method', 'attribution_prediction_threshold']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
                 keep_args_from_config.append(a.replace('--',''))

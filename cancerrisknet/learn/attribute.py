@@ -14,7 +14,7 @@ from functools import partial
 torch.backends.cudnn.enabled = False
 
 
-def compute_attribution(attribute_data, model, args,task_index=0):
+def compute_attribution(attribute_data, model, args,task_index=0, only_positive=True, model_for_preds=None, attribution_method="absolute", pred_threshold=0):
     """
     Computes the attribution of the given attribute_data using the given model and arguments.
 
@@ -28,49 +28,52 @@ def compute_attribution(attribute_data, model, args,task_index=0):
     - word2attr: A defaultdict that maps each code to its attribution.
     - word2censor_attr: A defaultdict that maps each time bin to a defaultdict that maps each code to its attribution.
     """
-def compute_attribution(attribute_data, model, args,task_index=0):
-
+    
     model = model.to(args.device)
     test_data_loader = get_dataset_loader(args, attribute_data)
     lig_code = LayerIntegratedGradients(model, model.model.code_embed)
-
     if hasattr(model.model, 'a_embed_add_fc') and hasattr(model.model, 'a_embed_scale_fc'):
         age_embeddings_layers = [model.model.a_embed_add_fc, model.model.a_embed_scale_fc]
         lig_age = LayerIntegratedGradients(model, age_embeddings_layers)
     else:
         lig_age = None
-
     test_iterator = iter(test_data_loader)
     word2attr = defaultdict(list)
+    word2attr_y= defaultdict(list)
     word2censor_attr = defaultdict(partial(defaultdict, list))
-    try:
-        for i, batch in enumerate(tqdm(test_iterator)):
-            batch = train.prepare_batch(batch, args)
-            codes, attr, ages, add_attr_ages, scale_attr_ages, combined_add_ages = \
-                attribute_batch(lig_code, lig_age, batch,task_index=task_index)
-            for patient_codes, patient_attr, gold, days in zip(codes, attr, batch['y'][task_index], batch['days_to_censor'][task_index]):
-                patient_codes = patient_codes.split()
-                time_bin = int(days//30)
-                for c, a in zip(patient_codes, patient_attr[-len(patient_codes):]):
-                    code = get_code(args, c)
-                    word2attr[code].append(a)
-                    if gold:        
-                        word2censor_attr[time_bin][code].append(a)
-            for patient_age, patient_age_attr in zip(ages, add_attr_ages):
-                word2attr["Add-Age-{}".format(patient_age)].append(patient_age_attr)
-            for patient_age, patient_age_attr in zip(ages, scale_attr_ages):
-                word2attr["Scale-Age-{}".format(patient_age)].append(patient_age_attr)
-            for patient_age, patient_age_attr in zip(ages, combined_add_ages):
-                word2attr["Combined-Age-{}".format(patient_age)].append(patient_age_attr)
-            if i >= args.max_batches_per_dev_epoch:
-                break
-    except Exception as e:
-        print(e)
+    count=0
+    for i, batch in enumerate(tqdm(test_iterator)):
+        if batch['y'][:,task_index].sum() == 0 and only_positive:
+            continue
+        batch = train.prepare_batch(batch, args)        
 
-    return word2attr, word2censor_attr
+        codes, attr, ages, add_attr_ages, scale_attr_ages, combined_add_ages, preds = \
+            attribute_batch(lig_code, lig_age, batch,task_index=task_index, model_for_preds=model_for_preds, attribution_method=attribution_method)
+        for patient_codes, patient_attr, gold, days, pred in zip(codes, attr, batch['y'][:, task_index], batch['days_to_censor'][:,task_index], preds):
+            if(pred<pred_threshold):
+                continue
+            
+            patient_codes = patient_codes.split()
+            time_bin = int(days//30)
+
+            for c, a in zip(patient_codes, patient_attr[-len(patient_codes):]):
+                code = get_code(args, c)
+                word2attr[code].append(a)
+                if gold:
+                    word2attr_y[code].append(a)
+                    word2censor_attr[time_bin][code].append(a)
+        for patient_age, patient_age_attr in zip(ages, add_attr_ages):
+            word2attr["Add-Age-{}".format(patient_age)].append(patient_age_attr)
+        for patient_age, patient_age_attr in zip(ages, scale_attr_ages):
+            word2attr["Scale-Age-{}".format(patient_age)].append(patient_age_attr)
+        for patient_age, patient_age_attr in zip(ages, combined_add_ages):
+            word2attr["Combined-Age-{}".format(patient_age)].append(patient_age_attr)
+        if i >= args.max_batches_per_dev_epoch:
+            break
+    return word2attr, word2attr_y, word2censor_attr
 
 
-def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3):
+def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3, model_for_preds=None, attribution_method="absolute"):
     """
     Computes the attributions for the given batch of data using the provided explainers.
 
@@ -90,34 +93,42 @@ def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3)
         - The attribution for the age input (scaling).
         - The combined attribution for the age input (additive and scaling).
     """
-def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3):
     batch_age = deepcopy(batch)
     index=(task_index, month_idx)
+    if(model_for_preds is not None):
+        logits = model_for_preds(batch['x'],batch)
+        probs = torch.sigmoid(logits).cpu().data.numpy() 
+    else:
+        probs=None
     if explain_code:
-        attributions_code = explain_code.attribute(inputs=(batch['x'], batch['age_seq'], batch['time_seq']),
-                                                   n_steps=2,
+        attributions_code = explain_code.attribute(inputs=(batch['x'],batch['age_seq'],batch['time_seq'],batch['age']),
+                                                   n_steps=5,
                                                    return_convergence_delta=False,
                                                    target=index,
                                                    additional_forward_args=batch)
-    
+        #We could also compute the norm of the attributions instead of sum.
+        #attributions_code = torch.norm(attributions_code,dim=2).squeeze(0)
         attributions_code = attributions_code.sum(dim=2).squeeze(0)
-        attributions_code = attributions_code / torch.norm(attributions_code)
+        #per batch normalization of attributions seems counterintuitive, we normalize per sample
+        attributions_code = attributions_code / torch.norm(attributions_code, p=2, dim=1, keepdim=True)
+        #attributions_code = attributions_code / torch.norm(attributions_code)
         attributions_code = attributions_code.cpu().detach().numpy()
+        if(attribution_method=="relative"):
+            attributions_code = attributions_code * probs[:,task_index,month_idx].reshape(-1, 1) #relative attribution
     else:
         attributions_code = []
 
     if explain_age:
-        attributions_age = explain_age.attribute(inputs=(batch_age['x'], batch_age['age_seq'], batch_age['time_seq']),
+        attributions_age = explain_age.attribute(inputs=(batch['x'],batch['age_seq'],batch['time_seq'],batch['age']),
                                                  n_steps=2,
                                                  return_convergence_delta=False,
                                                  target=index,
                                                  attribute_to_layer_input=True,
                                                  additional_forward_args=batch_age)
-
         attributions_age[0] = attributions_age[0].sum(dim=(-1, -2)).squeeze()
-        attributions_age[0] = attributions_age[0]/torch.norm(attributions_age[0])
+        attributions_age[0] = attributions_age[0]#/torch.norm(attributions_age[0])
         attributions_age[1] = attributions_age[1].sum(dim=(-1, -2)).squeeze()
-        attributions_age[1] = attributions_age[1]/torch.norm(attributions_age[1])
+        attributions_age[1] = attributions_age[1]#/torch.norm(attributions_age[1])
 
         age_attribution_add = attributions_age[0].cpu().detach().numpy()
         age_attribution_scale = attributions_age[1].cpu().detach().numpy()
@@ -128,4 +139,4 @@ def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3)
         age_attribution_combined = []
     
     return batch['code_str'], attributions_code, (batch_age['age']//365).squeeze().tolist(), age_attribution_add,\
-        age_attribution_scale, age_attribution_combined
+        age_attribution_scale, age_attribution_combined, probs[:,task_index,month_idx].reshape(-1, 1)

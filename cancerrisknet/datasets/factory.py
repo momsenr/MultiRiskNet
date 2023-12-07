@@ -65,7 +65,6 @@ def build_code_to_index_map(args):
     all_observed_codes = [get_code(args, code) for code in all_codes]
     print("Length of all_observed", len(all_observed_codes))
     all_codes_counts = dict(Counter(all_observed_codes))
-    print(len(all_codes_counts))
     all_codes = list(all_codes_counts.keys())
     all_codes_p = list(all_codes_counts.values())
     all_codes_p = [i/sum(all_codes_p) for i in all_codes_p]
@@ -104,7 +103,7 @@ def get_dataset(args):
 
     if args.attribute:
         attr = dataset_class(args, 'test',args.metadata_path, False)
-        attr.split_group='attr'
+        attr.split_group='attribute'
     else:
         attr = []
 
