@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 data/*
+configs/*
 !data/*.yaml
 !data/icd8_disease_descriptions.tsv
 !data/icd9_disease_descriptions.tsv

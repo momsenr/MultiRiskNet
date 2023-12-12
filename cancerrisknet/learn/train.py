@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from cancerrisknet.learn.step import model_step
-from cancerrisknet.utils.eval import compute_eval_metrics_multitask
+from cancerrisknet.utils.eval import compute_eval_metrics_multiclass
 from cancerrisknet.utils.learn import init_metrics_dictionary, \
     get_dataset_loader, get_train_variables
 from cancerrisknet.utils.time_logger import TimeLogger
@@ -65,20 +65,16 @@ def train_model(train_data, dev_data, model, args):
                             param_group['lr'] = 0.0
                 layers_frozen=True
 
-            loss,  golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
+            loss,  golds, probs, pids, censor_time_indices, days_to_final_censors, dates = \
                 run_epoch(data_loader, train=if_train, truncate_epoch=True, models=models,
                           optimizers=optimizers, args=args, smart_loss=(smart_loss and if_train),smart_verbose=True)
             logger_epoch.log("Run epoch ({})".format(key_prefix))
 
-            log_statement, epoch_stats, _ = compute_eval_metrics_multitask(args, loss, golds, patient_golds, probs,
+            log_statement, epoch_stats, _ = compute_eval_metrics_multiclass(args, loss, golds, probs,
                                                                  pids, dates, censor_time_indices, days_to_final_censors,
                                                                  epoch_stats, key_prefix)
             logger_epoch.log("Compute eval metrics ({})".format(key_prefix))
             print(log_statement)
-            if args.loss_weights=='uncertainty':
-                print('uncertainty weights:', models[args.model_name].log_vars)
-            if(args.model_name == 'transformer_softsharing'):
-                print('soft sharing loss', models[args.model_name].soft_sharing_loss())
 
         # Save model if beats best dev (min loss or max c-index_{i,a})
         best_func, arg_best = (min, np.argmin) if 'loss' in tuning_key else (max, np.argmax)
@@ -156,7 +152,6 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args,smart
     days_to_final_censors = []
     dates = []
     golds = []
-    patient_golds = []
     losses = []
     pids = []
     logger = TimeLogger(args, args.time_logger_step) if args.time_logger_verbose >= 3 else TimeLogger(args, 0)
@@ -187,10 +182,9 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args,smart
             break
         
         with torch.no_grad():
-            golds.extend(batch['y'].data.numpy().astype(bool))
-            patient_golds.extend(batch['future_cancer_array'].data.numpy().astype(bool))
+            golds.extend(batch['y_seq'].data.numpy().astype(int))
             dates.extend(batch['admit_date'].data.numpy().astype(int))
-            censor_time_indices.extend(batch['time_index_at_event'].data.numpy().astype(int))
+            censor_time_indices.extend(batch['censor_time_index'].data.numpy().astype(int))
             days_to_final_censors.extend(batch['days_to_censor'].data.numpy().astype(int))
             pids.extend(batch['patient_id'].data.numpy().astype(int))
 
@@ -219,17 +213,17 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args,smart
         tqdm_bar.update()
 
     avg_loss = np.mean(losses)
-    return avg_loss, golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates
+    return avg_loss, golds, probs, pids, censor_time_indices, days_to_final_censors, dates
 
 
 def prepare_batch(batch, args):
-    to_gpu = ['x', 'y', 'time_seq', 'age', 'age_seq']
+    to_gpu = ['x', 'time_seq', 'age', 'age_seq']
     to_gpu_convert_to_float = ['y_seq', 'y_mask']
     for key in batch.keys():
         if key in to_gpu:
             batch[key] = batch[key].to(args.device)
         elif key in to_gpu_convert_to_float:
-            batch[key] = batch[key].float().to(args.device)
+            batch[key] = batch[key].int().to(args.device)
     return batch
 
 def eval_model(eval_data, name, models, args):
@@ -249,7 +243,7 @@ def eval_model(eval_data, name, models, args):
     logger_eval.log('Load eval data')
 
 
-    loss, golds, patient_golds, probs, pids, censor_time_indices, days_to_final_censors, dates = run_epoch(
+    loss, golds, probs, pids, censor_time_indices, days_to_final_censors, dates = run_epoch(
         data_loader,
         train=False,
         truncate_epoch=(not args.exhaust_dataloader and eval_data.split_group != 'test'),
@@ -262,9 +256,9 @@ def eval_model(eval_data, name, models, args):
     logger_eval.log('Run eval epoch')    
 
 
-    log_statement, eval_stats, eval_preds = compute_eval_metrics_multitask(
+    log_statement, eval_stats, eval_preds = compute_eval_metrics_multiclass(
                             args, loss,
-                            golds, patient_golds, probs, pids, dates,
+                            golds, probs, pids, dates,
                             censor_time_indices, days_to_final_censors, eval_stats, name)
     print(log_statement)
     logger_eval.log('Compute eval metrics')

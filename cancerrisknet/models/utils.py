@@ -112,3 +112,24 @@ class MultiTaskCumulativeProbabilityLayer(nn.Module):
         cum_prob = torch.sum(masked_hazards, dim=2) + self.base_hazard_fcs(x).view(B, self.args.num_tasks, 1)
 
         return cum_prob
+
+
+class MultiClassCumulativeProbabilityLayer(nn.Module):
+    """
+        The cumulative layer for multi-task learning which defines the
+        monotonically increasing risk scores for each task.
+    """
+
+    def __init__(self, num_features, max_followup, args):
+        super(MultiClassCumulativeProbabilityLayer, self).__init__()
+        self.args = args
+        self.num_classes = args.num_tasks + 1
+
+        # Vectorized task-specific hazard functions and base hazard functions
+        self.class_probabilities_fcs = nn.Linear(num_features, self.num_classes * max_followup)
+
+    def forward(self, x):
+        preds = self.class_probabilities_fcs(x)
+        return preds.view(-1, self.num_classes,
+                               preds.shape[1] // self.num_classes)
+ 

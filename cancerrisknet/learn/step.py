@@ -60,32 +60,34 @@ def model_step(batch, models, train_model, args,smart_loss=False,smart_verbose=F
 
     Returns:
         loss: scalar for loss on batch as a tensor
-        preds: predicted labels as numpy array
         probs: softmax probabilities as numpy array
-        golds: labels at the trajectory level, numpy array version of arg y
-        patient_golds: labels at the patient level for each task
-        pids: deidentified patient ids as a list of strings
-        censor_times: feature rep for batch
-        days_to_censor: the time before censorship as a tensor
-        dates: the admission date as a tensor
     """
     logits = models[args.model_name](batch['x'], batch)
-    if args.loss_weights=='uncertainty':
-        loss = get_multi_task_loss(logits, batch, args, log_vars=models[args.model_name].log_vars)
-    elif args.loss_weights=='smart' and smart_loss==True:
-        loss = get_multi_task_loss(logits, batch, args,smart=True,smart_verbose=smart_verbose)
-    else:
-        loss = get_multi_task_loss(logits, batch, args)
-
-    if(args.model_name == 'transformer_softsharing'):
-        loss += models[args.model_name].soft_sharing_loss()
+    loss = get_multi_class_loss(logits, batch, args)
 
     if train_model:
         loss.backward()
 
-    # Use sigmoid for multi-label tasks and convert to numpy
-    probs = torch.sigmoid(
-        logits).cpu().data.numpy()  # Shape is T, B, len(args.month_endpoints) where T is number of tasks
-
+    probs = F.softmax(logits, dim=1).cpu().data.numpy()
 
     return loss.cpu().data.item(), probs
+
+def get_multi_class_loss(logits, batch, args):
+    """
+    Compute loss
+
+    Args:
+
+    Returns:
+        torch.Tensor: Total multi-task loss.
+    """
+    y_seq = batch['y_seq']
+    y_mask = batch['y_mask']
+    B, C, T = logits.shape
+
+    # Convert y_seq to long type, move to batch prerprocess later
+    y_seq = y_seq.long()
+
+    total_loss = F.cross_entropy(logits.transpose(1, 2).reshape(B * T, C), y_seq.view(-1))
+
+    return total_loss
