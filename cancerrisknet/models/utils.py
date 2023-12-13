@@ -125,7 +125,6 @@ class MultiClassCumulativeProbabilityLayer(nn.Module):
         self.args = args
         self.num_classes = args.num_tasks + 1
 
-        # Vectorized task-specific hazard functions and base hazard functions
         self.class_probabilities_fcs = nn.Linear(num_features, self.num_classes * max_followup)
 
     def forward(self, x):
