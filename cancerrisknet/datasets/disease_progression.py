@@ -171,10 +171,29 @@ class DiseaseProgressionDataset(data.Dataset):
         ys = self.patients_with_valid_trajectories['label']
         self.patients_with_valid_trajectories.drop(columns=['label'], inplace=True)
         label_counts = Counter(ys)
-        weight_per_label = 1. / len(label_counts)
-        label_weights = {
-            label: weight_per_label / count for label, count in label_counts.items()
-        }
+        # Define your desired ratios
+        if(self.args.loss_weights=='PC'):
+            desired_ratios = {'PC': 4, 'OC': 1, '0': 3}
+        else:
+            desired_ratios = {'PC': 1, 'OC': 1, '0': 1}
+
+        # Adjusting the label_weights calculation
+        label_weights = {}
+        for label, count in label_counts.items():
+            # Assuming label 1 corresponds to PC, label 2 to OC, and label 0 to class 0
+            if label == 1:  # PC
+                ratio_factor = desired_ratios['PC']
+            elif label == 2:  # OC
+                ratio_factor = desired_ratios['OC']
+            else:  # Class 0
+                ratio_factor = desired_ratios['0']
+
+            label_weights[label] = (1.0 / count) * ratio_factor
+
+        #weight_per_label = 1. / len(label_counts)
+        #label_weights = {
+        #    label: weight_per_label / count for label, count in label_counts.items()
+        #}
         self.weights = [label_weights[d] for d in ys]
 
     def get_label(self, events_to_date, until_idx):

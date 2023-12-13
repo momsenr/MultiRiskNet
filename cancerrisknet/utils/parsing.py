@@ -84,7 +84,7 @@ def parse_args(args_str=None):
     parser.add_argument('--loss_fn', type=str, default="binary_cross_entropy_with_logits",
                         help='loss function to use, available: [Xent (default), MSE]')
     parser.add_argument('--loss_weights', type=str, default="equal",
-                        help='loss weights to use, available: [equal (default), smart, uncertainty]')
+                        help='loss weights to use, available: [equal (default), smart, uncertainty, PC]')
     parser.add_argument('--soft_sharing_lambda', type=float, default=0.00001, help="lambda for soft parameter sharing.")
     parser.add_argument('--transformer_forced_on_task', action='store_true', default=False,
                         help='Whether or not to force each transformer to correspond to one task. Only relevant if model_name is transformer_softsharing.')

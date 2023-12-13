@@ -85,9 +85,14 @@ def get_multi_class_loss(logits, batch, args):
     y_mask = batch['y_mask']
     B, C, T = logits.shape
 
+    if(args.loss_weights=='PC'):
+        weight=torch.tensor([0.5,0.25,0.25]).to(logits.device)
+    else:
+        weight=None    
+
     # Convert y_seq to long type, move to batch prerprocess later
     y_seq = y_seq.long()
 
-    total_loss = F.cross_entropy(logits.transpose(1, 2).reshape(B * T, C), y_seq.view(-1))
+    total_loss = F.cross_entropy(logits.transpose(1, 2).reshape(B * T, C), y_seq.view(-1), weight=weight)
 
     return total_loss
