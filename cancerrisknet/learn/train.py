@@ -217,8 +217,8 @@ def run_epoch(data_loader, train, truncate_epoch, models, optimizers, args,smart
 
 
 def prepare_batch(batch, args):
-    to_gpu = ['x', 'time_seq', 'age', 'age_seq']
-    to_gpu_convert_to_float = ['y_seq', 'y_mask']
+    to_gpu = ['x', 'time_seq', 'age', 'age_seq', 'y_mask']
+    to_gpu_convert_to_float = ['y_seq']
     for key in batch.keys():
         if key in to_gpu:
             batch[key] = batch[key].to(args.device)
