@@ -97,8 +97,29 @@ def get_multi_class_loss(logits, batch, args):
     # Apply the mask to select the relevant elements
     logits_masked = logits_flat[y_mask_flat]
     y_seq_masked = y_seq_flat[y_mask_flat]
+    
+    if(args.loss_weights=='time'):
+        # Create a weight tensor for different timepoints
+        weights = torch.tensor([1.5, 1.5, 1.5, 1, 1], dtype=torch.float32, device=logits.device)
+        # Repeat the weights for each batch and flatten
+        weights_repeated = weights.repeat(B, 1).flatten()
+        # Apply mask to the weights
+        weights_masked = weights_repeated[y_mask_flat]
 
-    # Apply mask to compute the loss only on unmasked elements
-    total_loss = F.cross_entropy(logits_masked, y_seq_masked)
+        # Compute the loss with weights
+        total_loss = F.cross_entropy(logits_masked, y_seq_masked, reduction='none')
+        # Apply the weights and take the mean
+        weighted_loss = (total_loss * weights_masked).mean()
 
-    return total_loss
+        return weighted_loss
+    elif args.loss_weights == 'class':
+        # Define class-based weights
+        class_weights = torch.tensor([2, 1, 2], dtype=torch.float32, device=logits.device)
+
+        # Compute the loss with class-based weights
+        class_weighted_loss = F.cross_entropy(logits_masked, y_seq_masked, weight=class_weights)
+
+        return class_weighted_loss
+    else:
+        total_loss = F.cross_entropy(logits_masked, y_seq_masked )
+        return total_loss

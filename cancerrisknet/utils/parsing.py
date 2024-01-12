@@ -84,7 +84,7 @@ def parse_args(args_str=None):
     parser.add_argument('--loss_fn', type=str, default="binary_cross_entropy_with_logits",
                         help='loss function to use, available: [Xent (default), MSE]')
     parser.add_argument('--loss_weights', type=str, default="equal",
-                        help='loss weights to use, available: [equal (default), smart, uncertainty, PC]')
+                        help='loss weights to use, available: [equal (default), smart, uncertainty, PC, time, class]')
     parser.add_argument('--soft_sharing_lambda', type=float, default=0.00001, help="lambda for soft parameter sharing.")
     parser.add_argument('--transformer_forced_on_task', action='store_true', default=False,
                         help='Whether or not to force each transformer to correspond to one task. Only relevant if model_name is transformer_softsharing.')
@@ -161,6 +161,11 @@ def parse_args(args_str=None):
         elif(args.loss_weights=='smart'):
             print("ERROR: deprecated use of use_uncertainty_loss_weights detected. Use loss_weights instead. loss_weights is set to smart, aborting...")
             exit(-1)
+    
+    #check that loss_weights is valid
+    if(args.loss_weights not in ['equal','smart','uncertainty','PC','time','class']):
+        print("ERROR: loss_weights must be one of equal, smart, uncertainty, PC, time, class. Aborting...")
+        exit(-1)
 
     with open(args.cancer_code_dict_path, 'r') as file:
         data = file.read()
@@ -202,7 +207,7 @@ def parse_args(args_str=None):
                         '--save_dir', '--exp_id', '--results_path', '--resume_from_result']
         keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute', \
         'metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', \
-        'exp_id', 'results_path', 'attribution_method', 'attribution_prediction_threshold']
+        'exp_id', 'results_path', 'attribution_method', 'attribution_prediction_threshold', 'loss_weights']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
                 keep_args_from_config.append(a.replace('--',''))
