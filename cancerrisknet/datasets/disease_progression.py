@@ -173,7 +173,7 @@ class DiseaseProgressionDataset(data.Dataset):
         label_counts = Counter(ys)
         # Define your desired ratios
         if(self.args.loss_weights=='PC'):
-            desired_ratios = {'PC': 4, 'OC': 1, '0': 3}
+            desired_ratios = {'PC': 2, 'OC': 1, '0': 1}
         else:
             desired_ratios = {'PC': 1, 'OC': 1, '0': 1}
 

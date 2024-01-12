@@ -14,7 +14,8 @@ from functools import partial
 torch.backends.cudnn.enabled = False
 
 
-def compute_attribution(attribute_data, model, args,task_index=0, only_positive=True, model_for_preds=None, attribution_method="absolute", pred_threshold=0):
+def compute_attribution(attribute_data, model, args,class_index=0, only_positive=True,model_for_preds=None, attribution_method="absolute", pred_threshold=0):
+
     """
     Computes the attribution of the given attribute_data using the given model and arguments.
 
@@ -42,14 +43,20 @@ def compute_attribution(attribute_data, model, args,task_index=0, only_positive=
     word2attr_y= defaultdict(list)
     word2censor_attr = defaultdict(partial(defaultdict, list))
     count=0
+    month_index=3
     for i, batch in enumerate(tqdm(test_iterator)):
-        if batch['y'][:,task_index].sum() == 0 and only_positive:
+        #2024-01-08: in the ClassRisk implementation, batch['y'] is not set and we need to set it here
+        batch['y']=batch['y_seq'][:,month_index]==class_index
+        if batch['y'].sum() == 0 and only_positive:
             continue
         batch = train.prepare_batch(batch, args)        
 
         codes, attr, ages, add_attr_ages, scale_attr_ages, combined_add_ages, preds = \
-            attribute_batch(lig_code, lig_age, batch,task_index=task_index, model_for_preds=model_for_preds, attribution_method=attribution_method)
-        for patient_codes, patient_attr, gold, days, pred in zip(codes, attr, batch['y'][:, task_index], batch['days_to_censor'][:,task_index], preds):
+            attribute_batch(lig_code, lig_age, batch,class_index=class_index, month_idx=month_index, model_for_preds=model_for_preds, attribution_method=attribution_method)
+
+        #days_to_censor is a tensor of shape [num_classes,] containing the days to censor for each class
+        #this might be changed to a scalar later
+        for patient_codes, patient_attr, gold, days, pred in zip(codes, attr, batch['y'], batch['days_to_censor'][class_index], preds):
             if(pred<pred_threshold):
                 continue
             
@@ -73,7 +80,7 @@ def compute_attribution(attribute_data, model, args,task_index=0, only_positive=
     return word2attr, word2attr_y, word2censor_attr
 
 
-def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3, model_for_preds=None, attribution_method="absolute"):
+def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3, model_for_preds=None, attribution_method="absolute"):
     """
     Computes the attributions for the given batch of data using the provided explainers.
 
@@ -94,7 +101,7 @@ def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3,
         - The combined attribution for the age input (additive and scaling).
     """
     batch_age = deepcopy(batch)
-    index=(task_index, month_idx)
+    index=(class_index, month_idx)
     if(model_for_preds is not None):
         logits = model_for_preds(batch['x'],batch)
         probs = torch.sigmoid(logits).cpu().data.numpy() 
@@ -114,7 +121,7 @@ def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3,
         #attributions_code = attributions_code / torch.norm(attributions_code)
         attributions_code = attributions_code.cpu().detach().numpy()
         if(attribution_method=="relative"):
-            attributions_code = attributions_code * probs[:,task_index,month_idx].reshape(-1, 1) #relative attribution
+            attributions_code = attributions_code * probs[:,class_index,month_idx].reshape(-1, 1) #relative attribution
     else:
         attributions_code = []
 
@@ -139,4 +146,4 @@ def attribute_batch(explain_code, explain_age, batch, task_index=0, month_idx=3,
         age_attribution_combined = []
     
     return batch['code_str'], attributions_code, (batch_age['age']//365).squeeze().tolist(), age_attribution_add,\
-        age_attribution_scale, age_attribution_combined, probs[:,task_index,month_idx].reshape(-1, 1)
+        age_attribution_scale, age_attribution_combined, probs[:,class_index,month_idx].reshape(-1, 1)
