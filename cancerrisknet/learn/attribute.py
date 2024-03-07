@@ -14,7 +14,9 @@ from functools import partial
 torch.backends.cudnn.enabled = False
 
 
-def compute_attribution(attribute_data, model, args,class_index=0, only_positive=True,model_for_preds=None, attribution_method="absolute", pred_threshold=0):
+def compute_attribution(attribute_data, model, args,class_index=0, only_positive=True,\
+                        model_for_preds=None, attribution_method="absolute", pred_threshold=0, \
+                        attribution_sum_method='sum'):
 
     """
     Computes the attribution of the given attribute_data using the given model and arguments.
@@ -42,29 +44,50 @@ def compute_attribution(attribute_data, model, args,class_index=0, only_positive
     word2attr = defaultdict(list)
     word2attr_y= defaultdict(list)
     word2censor_attr = defaultdict(partial(defaultdict, list))
-    count=0
     month_index=3
+    #args.max_batches_per_dev_epoch=0
     for i, batch in enumerate(tqdm(test_iterator)):
+
         #2024-01-08: in the ClassRisk implementation, batch['y'] is not set and we need to set it here
+        #2024-03-05: I am uncertain if the following line is correct, as batch['y'] refers to the gold
+        #while batch['y_seq'] refers to a given time point. I will leave it as is for now.
         batch['y']=batch['y_seq'][:,month_index]==class_index
-        if batch['y'].sum() == 0 and only_positive:
-            continue
+        #if batch['y'].sum() == 0 and only_positive:
+        #    continue
         batch = train.prepare_batch(batch, args)        
 
+        ###START DEBUGGING CODE
+        #how many samples are in one batch?
+        #print("Batch size: ", batch['x'].shape[0])
+
         codes, attr, ages, add_attr_ages, scale_attr_ages, combined_add_ages, preds = \
-            attribute_batch(lig_code, lig_age, batch,class_index=class_index, month_idx=month_index, model_for_preds=model_for_preds, attribution_method=attribution_method)
+            attribute_batch(lig_code, lig_age, batch,class_index=class_index, month_idx=month_index, \
+                            model_for_preds=model_for_preds, attribution_method=attribution_method,
+                            attribution_sum_method=attribution_sum_method)
+
+        #print('length of codes (corresponding to trajectories)', len(codes))
+        #print(codes)
+
 
         #days_to_censor is a tensor of shape [num_classes,] containing the days to censor for each class
         #this might be changed to a scalar later
         for patient_codes, patient_attr, gold, days, pred in zip(codes, attr, batch['y'], batch['days_to_censor'][class_index], preds):
+            #print('patient_codes', patient_codes)
             if(pred<pred_threshold):
                 continue
             
             patient_codes = patient_codes.split()
             time_bin = int(days//30)
 
+            codes_dictionary='SNOMED'
+
             for c, a in zip(patient_codes, patient_attr[-len(patient_codes):]):
-                code = get_code(args, c)
+                if(codes_dictionary=='SNOMED'):
+                    #when using SNOMED, the values are already the codes
+                    code=c
+                else:
+                    code = get_code(args, c)
+
                 word2attr[code].append(a)
                 if gold:
                     word2attr_y[code].append(a)
@@ -80,7 +103,8 @@ def compute_attribution(attribute_data, model, args,class_index=0, only_positive
     return word2attr, word2attr_y, word2censor_attr
 
 
-def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3, model_for_preds=None, attribution_method="absolute"):
+def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3, model_for_preds=None, \
+                    attribution_method="absolute", attribution_sum_method='sum'):
     """
     Computes the attributions for the given batch of data using the provided explainers.
 
@@ -113,15 +137,36 @@ def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3
                                                    return_convergence_delta=False,
                                                    target=index,
                                                    additional_forward_args=batch)
-        #We could also compute the norm of the attributions instead of sum.
-        #attributions_code = torch.norm(attributions_code,dim=2).squeeze(0)
-        attributions_code = attributions_code.sum(dim=2).squeeze(0)
-        #per batch normalization of attributions seems counterintuitive, we normalize per sample
-        attributions_code = attributions_code / torch.norm(attributions_code, p=2, dim=1, keepdim=True)
-        #attributions_code = attributions_code / torch.norm(attributions_code)
+
+        if(attribution_sum_method=='sum'):
+            # If the method is 'sum', sum up the attribution values across the specified dimension (dim=2).
+            # This collapses the third dimension and aggregates the attribution scores.
+            attributions_code = attributions_code.sum(dim=2).squeeze(0)
+
+            # In this case, we need to take the absolute value of the attribution (see bug E234 and E235)
+            attributions_code = torch.abs(attributions_code)
+
+            #normalize per sample.
+            attributions_code = attributions_code / attributions_code.sum(dim=1, keepdim=True)
+
+        elif(attribution_sum_method=='sum_norm'):
+            # If the method is 'sum_norm', first compute the absolute value of all attribution values.
+            # This ensures that all contributions are treated as positive quantities.
+            # Then, sum up these absolute values across the specified dimension (dim=2),
+            attributions_code = torch.abs(attributions_code).sum(dim=2).squeeze(0)
+            
+            #normalize per sample.
+            attributions_code = attributions_code / attributions_code.sum(dim=1, keepdim=True)
+        elif(attribution_sum_method=='L2'):
+            attributions_code = attributions_code.sum(dim=2).squeeze(0)
+            #normalize per sample with L2 norm
+            attributions_code = attributions_code / torch.norm(attributions_code, p=2, dim=1, keepdim=True)
+
+
         attributions_code = attributions_code.cpu().detach().numpy()
         if(attribution_method=="relative"):
             attributions_code = attributions_code * probs[:,class_index,month_idx].reshape(-1, 1) #relative attribution
+    
     else:
         attributions_code = []
 

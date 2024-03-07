@@ -108,7 +108,7 @@ if __name__ == '__main__':
         for class_index in range(1): #range(args.num_tasks):
             test_attribution, test_attribution_y, test_censored_attribution = attribute.compute_attribution(attribution_set, model_for_attribution, args, class_index=class_index, \
             model_for_preds=model, attribution_method=args.attribution_method, \
-            pred_threshold=args.attribution_prediction_threshold)
+            pred_threshold=args.attribution_prediction_threshold, attribution_sum_method=args.attribution_sum_method)
             print("Save attribution results for task {} to {}".format(class_index,args.results_path))
 
             pickle.dump(test_attribution_y, open("{}.test_attribution_y_task{}".format(args.results_path,str(class_index)), 'wb'))

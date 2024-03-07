@@ -130,7 +130,8 @@ def parse_args(args_str=None):
     #attribution
     parser.add_argument('--attribution_method', type=str, default='absolute', help='Attribution method to use. Choose from ["absolute","relative"]')
     parser.add_argument('--attribution_prediction_threshold', type=float, default=0, help='Only consider predictions higher than threshold for attribution. [default: 0]')
-
+    parser.add_argument('--attribution_sum_method', type=str, default='sum', help='Attribution summation method to use. Choose from ["sum","sum_norm"]')
+ 
 
     # Where to store stuff
     parser.add_argument('--save_dir', type=str, required=True, help='The output file location.')
@@ -368,7 +369,6 @@ def md5(key):
         returns a hashed with md5 string of the key
     """
     return hashlib.md5(key.encode()).hexdigest()
-
 
 def get_code(args, event, char=False):
     if type(event) is dict:
