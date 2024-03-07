@@ -9,6 +9,7 @@ sys.path.insert(0, dirname(dirname(realpath(__file__))))
 from cancerrisknet.utils.parsing import md5
 from cancerrisknet.utils.parsing import get_code
 import pickle
+import pandas as pd
 
 
 NO_DATASET_ERR = "Dataset {} not in DATASET_REGISTRY! Available datasets are {}"
@@ -59,10 +60,13 @@ def build_code_to_index_map(args):
         )
 
     with open(vocab_path, 'r') as f:
-        all_codes = f.readlines()
-        all_codes = [x.rstrip('\n') for x in all_codes]
+        # Read df from file
+        pd_df = pd.read_csv(f, header=None)
+        # Convert df to list
+        all_codes = pd_df[0].tolist()
 
-    all_observed_codes = [get_code(args, code) for code in all_codes]
+    #2024-01-15 we don't need to run any preprocessing here anymore
+    all_observed_codes = all_codes#[get_code(args, code) for code in all_codes]
     print("Length of all_observed", len(all_observed_codes))
     all_codes_counts = dict(Counter(all_observed_codes))
     all_codes = list(all_codes_counts.keys())

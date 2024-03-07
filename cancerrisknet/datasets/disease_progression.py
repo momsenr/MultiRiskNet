@@ -68,7 +68,6 @@ class DiseaseProgressionDataset(data.Dataset):
             total_positive = self.patients_with_valid_trajectories[f'y_{key}'].sum()
             print("Number of positive patients for cancer type '{}' in '{}' dataset is: {}.".format(key, self.split_group, total_positive))
 
-        #print("Number of positive patients  in '{}' dataset is: {}.".format(self.split_group, total_positive))
         self.class_count()
 
     def process_events(self, events):
@@ -147,7 +146,7 @@ class DiseaseProgressionDataset(data.Dataset):
         multipliers = 2*np.pi / (np.linspace(
             start=MIN_TIME_EMBED_PERIOD_IN_DAYS, stop=MAX_TIME_EMBED_PERIOD_IN_DAYS, num=self.args.time_embed_dim
         ))
-
+        
         positional_embeddings = np.cos(deltas.reshape(-1, 1) * multipliers.reshape(1, -1))
         return deltas.max().astype(int), positional_embeddings
 
@@ -261,7 +260,8 @@ class DiseaseProgressionDataset(data.Dataset):
         samples = self.get_trajectory(patient_index)
         items = []
         for sample in samples:
-            code_str = " ".join(sample['codes'])
+            #code_str = " ".join(sample['codes'])
+            code_str = " ".join([str(code) for code in sample['codes']])
             x = [self.get_index_for_code(code, self.args.code_to_index_map) for code in sample['codes']]
             time_seq = sample['time_seq'].tolist()
             age_seq = sample['age_seq'].tolist()
@@ -278,7 +278,8 @@ class DiseaseProgressionDataset(data.Dataset):
         return items
 
     def get_index_for_code(self, code, code_to_index_map):
-        code = get_code(self.args, code)
+        #2024-01-15: we now moved all the preprocessing to the jupyter notebooks
+        #code = get_code(self.args, code)
         pad_index = len(code_to_index_map)
         if code == PAD_TOKEN:
             return pad_index
