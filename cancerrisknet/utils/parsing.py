@@ -207,7 +207,7 @@ def parse_args(args_str=None):
                         '--eval_batch_size', '--max_batches_per_dev_epoch', 
                         '--save_dir', '--exp_id', '--results_path', '--resume_from_result']
         keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute', \
-        'metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', \
+        'metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'cancer_code_dict_path',\
         'exp_id', 'results_path', 'attribution_method', 'attribution_prediction_threshold', 'loss_weights']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
