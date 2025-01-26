@@ -1,4 +1,4 @@
-Outcome Conflation when Predicting Binary Outcomes using Electronic Health Records
+# Outcome Conflation when Predicting Binary Outcomes using Electronic Health Records
 Authors: S. Momsen Reincke, Camilo Espinosa, Philip Chung, Tomin James, Eloïse Berson, Nima Aghaeepour
 
 Introduction
