@@ -164,7 +164,7 @@ def parse_args(args_str=None):
             exit(-1)
     
     #check that loss_weights is valid
-    if(args.loss_weights not in ['equal','smart','uncertainty','PC','time','class']):
+    if(args.loss_weights not in ['equal','smart','uncertainty','PC','time','class','class_PC']):
         print("ERROR: loss_weights must be one of equal, smart, uncertainty, PC, time, class. Aborting...")
         exit(-1)
 
@@ -208,7 +208,7 @@ def parse_args(args_str=None):
                         '--save_dir', '--exp_id', '--results_path', '--resume_from_result']
         keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute', \
         'metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'cancer_code_dict_path',\
-        'exp_id', 'results_path', 'attribution_method', 'attribution_prediction_threshold', 'loss_weights']
+        'exp_id', 'results_path', 'attribution_method', 'attribution_sum_method', 'attribution_prediction_threshold', 'loss_weights']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
                 keep_args_from_config.append(a.replace('--',''))
