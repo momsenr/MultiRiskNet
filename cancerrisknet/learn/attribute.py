@@ -13,7 +13,7 @@ from functools import partial
 torch.backends.cudnn.enabled = False
 
 
-def compute_attribution(attribute_data, model, args,class_index=0, only_positive=True,\
+def compute_attribution(attribute_data, model, args,class_index=0, only_positive=False,\
                         model_for_preds=None, attribution_method="absolute", pred_threshold=0, \
                         attribution_normalization_method='L1'):
 
@@ -55,18 +55,11 @@ def compute_attribution(attribute_data, model, args,class_index=0, only_positive
             continue
         batch = train.prepare_batch(batch, args)        
 
-        ###START DEBUGGING CODE
-        #how many samples are in one batch?
-        #print("Batch size: ", batch['x'].shape[0])
 
         codes, attr, ages, add_attr_ages, scale_attr_ages, combined_add_ages, preds = \
             attribute_batch(lig_code, lig_age, batch,class_index=class_index, month_idx=month_index, \
                             model_for_preds=model_for_preds, attribution_method=attribution_method,
                             attribution_normalization_method=attribution_normalization_method)
-
-        #print('length of codes (corresponding to trajectories)', len(codes))
-        #print(codes)
-
 
         #days_to_censor is a tensor of shape [num_classes,] containing the days to censor for each class
         #this might be changed to a scalar later
