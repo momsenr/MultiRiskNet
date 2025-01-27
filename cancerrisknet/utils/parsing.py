@@ -130,7 +130,7 @@ def parse_args(args_str=None):
     #attribution
     parser.add_argument('--attribution_method', type=str, default='absolute', help='Attribution method to use. Choose from ["absolute","relative"]')
     parser.add_argument('--attribution_prediction_threshold', type=float, default=0, help='Only consider predictions higher than threshold for attribution. [default: 0]')
-    parser.add_argument('--attribution_sum_method', type=str, default='sum', help='Attribution summation method to use. Choose from ["sum","sum_norm"]')
+    parser.add_argument('--attribution_normalization_method', type=str, default='L1', help='Attribution normalization method to use. Choose from ["L1", "L2", "L1_positives"]')
  
 
     # Where to store stuff
@@ -208,7 +208,7 @@ def parse_args(args_str=None):
                         '--save_dir', '--exp_id', '--results_path', '--resume_from_result']
         keep_args_from_config = ['train', 'dev', 'epochs', 'tuning_metric', 'test', 'attribute', \
         'metadata_path', 'no_random_sample_eval_trajectories', 'max_eval_indices', 'cancer_code_dict_path',\
-        'exp_id', 'results_path', 'attribution_method', 'attribution_sum_method', 'attribution_prediction_threshold', 'loss_weights']
+        'exp_id', 'results_path', 'attribution_method', 'attribution_normalization_method', 'attribution_prediction_threshold', 'loss_weights']
         for a in overwrite_args:
             if a in sys.argv:  # if specified differently for continued experiments
                 keep_args_from_config.append(a.replace('--',''))

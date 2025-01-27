@@ -10,13 +10,12 @@ import pandas as pd
 import numpy as np
 from functools import partial
 
-
 torch.backends.cudnn.enabled = False
 
 
 def compute_attribution(attribute_data, model, args,class_index=0, only_positive=True,\
                         model_for_preds=None, attribution_method="absolute", pred_threshold=0, \
-                        attribution_sum_method='sum'):
+                        attribution_normalization_method='L1'):
 
     """
     Computes the attribution of the given attribute_data using the given model and arguments.
@@ -52,8 +51,8 @@ def compute_attribution(attribute_data, model, args,class_index=0, only_positive
         #2024-03-05: I am uncertain if the following line is correct, as batch['y'] refers to the gold
         #while batch['y_seq'] refers to a given time point. I will leave it as is for now.
         batch['y']=batch['y_seq'][:,month_index]==class_index
-        #if batch['y'].sum() == 0 and only_positive:
-        #    continue
+        if batch['y'].sum() == 0 and only_positive:
+            continue
         batch = train.prepare_batch(batch, args)        
 
         ###START DEBUGGING CODE
@@ -63,7 +62,7 @@ def compute_attribution(attribute_data, model, args,class_index=0, only_positive
         codes, attr, ages, add_attr_ages, scale_attr_ages, combined_add_ages, preds = \
             attribute_batch(lig_code, lig_age, batch,class_index=class_index, month_idx=month_index, \
                             model_for_preds=model_for_preds, attribution_method=attribution_method,
-                            attribution_sum_method=attribution_sum_method)
+                            attribution_normalization_method=attribution_normalization_method)
 
         #print('length of codes (corresponding to trajectories)', len(codes))
         #print(codes)
@@ -104,7 +103,7 @@ def compute_attribution(attribute_data, model, args,class_index=0, only_positive
 
 
 def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3, model_for_preds=None, \
-                    attribution_method="absolute", attribution_sum_method='sum'):
+                    attribution_method="absolute", attribution_normalization_method='L1'):
     """
     Computes the attributions for the given batch of data using the provided explainers.
 
@@ -138,30 +137,31 @@ def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3
                                                    target=index,
                                                    additional_forward_args=batch)
 
-        if(attribution_sum_method=='sum'):
-            # If the method is 'sum', sum up the attribution values across the specified dimension (dim=2).
-            # This collapses the third dimension and aggregates the attribution scores.
+        if(attribution_normalization_method=='L1'):
+            # Sum attributions across the specified dimension (dim=2).
             attributions_code = attributions_code.sum(dim=2).squeeze(0)
 
-            # In this case, we need to take the absolute value of the attribution (see bug E234 and E235)
+            #  Take absolute value before normalization
             attributions_code = torch.abs(attributions_code)
 
-            #normalize per sample.
-            attributions_code = attributions_code / attributions_code.sum(dim=1, keepdim=True)
+            # Divide each feature by the L1 norm
+            attributions_code = attributions_code / (torch.norm(attributions_code, p=1, dim=1, keepdim=True) + 1e-8)
 
-        elif(attribution_sum_method=='sum_norm'):
+        elif(attribution_normalization_method=='L1_positives'):
             # If the method is 'sum_norm', first compute the absolute value of all attribution values.
             # This ensures that all contributions are treated as positive quantities.
             # Then, sum up these absolute values across the specified dimension (dim=2),
             attributions_code = torch.abs(attributions_code).sum(dim=2).squeeze(0)
             
             #normalize per sample.
-            attributions_code = attributions_code / attributions_code.sum(dim=1, keepdim=True)
-        elif(attribution_sum_method=='L2'):
+            attributions_code = attributions_code / (torch.norm(attributions_code, p=1, dim=1, keepdim=True) + 1e-8)
+            
+        elif(attribution_normalization_method=='L2'):
+            # If the method is 'L2', normalize the attribution values using the L2 norm.
             attributions_code = attributions_code.sum(dim=2).squeeze(0)
-            #normalize per sample with L2 normx
-            attributions_code = attributions_code / torch.norm(attributions_code, p=2, dim=1, keepdim=True)
-
+            
+            #normalize per sample with L2 norm
+            attributions_code = attributions_code / (torch.norm(attributions_code, p=2, dim=1, keepdim=True)+ 1e-8)
 
         attributions_code = attributions_code.cpu().detach().numpy()
         if(attribution_method=="relative"):
