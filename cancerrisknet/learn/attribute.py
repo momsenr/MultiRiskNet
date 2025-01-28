@@ -155,7 +155,12 @@ def attribute_batch(explain_code, explain_age, batch, class_index=0, month_idx=3
             
             #normalize per sample with L2 norm
             attributions_code = attributions_code / (torch.norm(attributions_code, p=2, dim=1, keepdim=True)+ 1e-8)
-
+        elif(attribution_normalization_method=='L2_positives'):
+            # If the method is 'L2', normalize the attribution values using the L2 norm.
+            attributions_code = attributions_code.sum(dim=2).squeeze(0)
+            
+            #normalize per sample with L2 norm
+            attributions_code = torch.abs(attributions_code) / (torch.norm(attributions_code, p=2, dim=1, keepdim=True)+ 1e-8)
         attributions_code = attributions_code.cpu().detach().numpy()
         if(attribution_method=="relative"):
             attributions_code = attributions_code * probs[:,class_index,month_idx].reshape(-1, 1) #relative attribution
